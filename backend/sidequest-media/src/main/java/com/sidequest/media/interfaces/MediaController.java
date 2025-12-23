@@ -4,11 +4,14 @@ import com.sidequest.common.Result;
 import com.sidequest.media.application.MediaService;
 import com.sidequest.media.domain.Danmaku;
 import com.sidequest.media.infrastructure.MediaDO;
+import com.sidequest.media.interfaces.dto.DanmakuVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/media")
@@ -41,9 +44,16 @@ public class MediaController {
     }
 
     @GetMapping("/danmaku")
-    public Result<List<Object>> getDanmaku(@RequestParam Long videoId, @RequestParam Long fromMs, @RequestParam Long toMs) {
+    public Result<List<DanmakuVO>> getDanmaku(@RequestParam Long videoId, @RequestParam Long fromMs, @RequestParam Long toMs) {
         String key = "danmaku:" + videoId;
-        return Result.success(List.copyOf(redisTemplate.opsForZSet().rangeByScore(key, fromMs, toMs)));
+        List<Object> range = List.copyOf(redisTemplate.opsForZSet().rangeByScore(key, fromMs, toMs));
+        List<DanmakuVO> vos = range.stream().map(obj -> {
+            Danmaku danmaku = (Danmaku) obj;
+            DanmakuVO vo = new DanmakuVO();
+            BeanUtils.copyProperties(danmaku, vo);
+            return vo;
+        }).collect(Collectors.toList());
+        return Result.success(vos);
     }
 }
 

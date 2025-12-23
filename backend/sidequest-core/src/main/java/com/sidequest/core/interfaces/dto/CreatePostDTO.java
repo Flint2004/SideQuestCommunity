@@ -9,5 +9,9 @@ public class CreatePostDTO {
     private String content;
     private Long sectionId;
     private List<String> tags;
+    private List<String> imageUrls;
+    private String videoUrl;
+    private String videoCoverUrl;
+    private Integer videoDuration;
 }
 

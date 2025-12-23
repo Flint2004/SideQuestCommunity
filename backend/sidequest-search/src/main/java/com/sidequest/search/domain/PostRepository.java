@@ -1,10 +1,13 @@
 package com.sidequest.search.domain;
 
 import com.sidequest.search.infrastructure.PostDoc;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import java.util.List;
 
 public interface PostRepository extends ElasticsearchRepository<PostDoc, String> {
-    List<PostDoc> findByTitleOrContent(String title, String content);
+    Page<PostDoc> findByTitleOrContent(String title, String content, Pageable pageable);
+    Page<PostDoc> findByAuthorId(Long authorId, Pageable pageable);
 }
 

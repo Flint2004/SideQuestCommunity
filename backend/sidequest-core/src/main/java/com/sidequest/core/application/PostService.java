@@ -26,6 +26,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sidequest.common.Result;
+import com.sidequest.common.event.UserEvent;
 
 @Service
 @RequiredArgsConstructor
@@ -151,6 +154,42 @@ public class PostService {
         }
     }
 
+    public Page<PostDO> adminGetPostList(int current, int size, Integer status) {
+        Page<PostDO> page = new Page<>(current, size);
+        LambdaQueryWrapper<PostDO> queryWrapper = new LambdaQueryWrapper<>();
+        if (status != null) {
+            queryWrapper.eq(PostDO::getStatus, status);
+        }
+        queryWrapper.orderByDesc(PostDO::getCreateTime);
+        return postMapper.selectPage(page, queryWrapper);
+    }
+
+    @Transactional
+    public void auditPost(Long id, boolean pass) {
+        PostDO post = postMapper.selectById(id);
+        if (post == null) {
+            throw new RuntimeException("Post not found");
+        }
+        if (post.getStatus() != PostDO.STATUS_AUDITING) {
+            throw new RuntimeException("Post is not in auditing status");
+        }
+        
+        if (pass) {
+            post.setStatus(PostDO.STATUS_NORMAL);
+            // 审核通过，同步到搜索服务
+            try {
+                String postJson = objectMapper.writeValueAsString(post);
+                kafkaTemplate.send("post-topic", post.getId().toString(), postJson);
+            } catch (Exception e) {
+                log.error("Failed to send post creation event after audit", e);
+            }
+        } else {
+            post.setStatus(PostDO.STATUS_BANNED);
+        }
+        post.setUpdateTime(LocalDateTime.now());
+        postMapper.updateById(post);
+    }
+
     @Transactional
     public void handleCreatePost(String userId, CreatePostDTO dto) {
         // 0. 校验分区是否存在
@@ -184,6 +223,10 @@ public class PostService {
                 .content(dto.getContent())
                 .sectionId(dto.getSectionId())
                 .tags(dto.getTags())
+                .imageUrls(dto.getImageUrls())
+                .videoUrl(dto.getVideoUrl())
+                .videoCoverUrl(dto.getVideoCoverUrl())
+                .videoDuration(dto.getVideoDuration())
                 .build();
         
         post.publish(); 
@@ -207,6 +250,8 @@ public class PostService {
             postDO.setTags(String.join(",", post.getTags()));
         }
         postDO.setVideoUrl(post.getVideoUrl());
+        postDO.setVideoCoverUrl(post.getVideoCoverUrl());
+        postDO.setVideoDuration(post.getVideoDuration());
         if (post.getImageUrls() != null) {
             postDO.setImageUrls(String.join(",", post.getImageUrls()));
         }
@@ -242,7 +287,19 @@ public class PostService {
                 .eq(PostDO::getId, postId)
                 .setSql("comment_count = comment_count + 1"));
         
-        kafkaTemplate.send("user-events", "post_comment", "User " + userId + " commented on " + postId);
+        try {
+            kafkaTemplate.send("user-events", "post_comment", objectMapper.writeValueAsString(
+                    UserEvent.builder()
+                            .type("interaction")
+                            .userId(Long.parseLong(userId))
+                            .targetUserId(postMapper.selectById(postId).getAuthorId())
+                            .targetId(postId)
+                            .content("commented on your post")
+                            .build()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send comment event", e);
+        }
     }
 
     @Transactional
@@ -268,9 +325,21 @@ public class PostService {
             postMapper.update(null, new LambdaUpdateWrapper<PostDO>()
                     .eq(PostDO::getId, postId)
                     .setSql("like_count = like_count + 1"));
+
+            try {
+                kafkaTemplate.send("user-events", "post_like", objectMapper.writeValueAsString(
+                        UserEvent.builder()
+                                .type("interaction")
+                                .userId(uid)
+                                .targetUserId(postMapper.selectById(postId).getAuthorId())
+                                .targetId(postId)
+                                .content("liked your post")
+                                .build()
+                ));
+            } catch (Exception e) {
+                log.error("Failed to send like event", e);
+            }
         }
-        
-        kafkaTemplate.send("user-events", "post_like", "User " + userId + " liked " + postId);
     }
 
     @Transactional
@@ -295,8 +364,20 @@ public class PostService {
             postMapper.update(null, new LambdaUpdateWrapper<PostDO>()
                     .eq(PostDO::getId, postId)
                     .setSql("favorite_count = favorite_count + 1"));
+
+            try {
+                kafkaTemplate.send("user-events", "post_favorite", objectMapper.writeValueAsString(
+                        UserEvent.builder()
+                                .type("interaction")
+                                .userId(uid)
+                                .targetUserId(postMapper.selectById(postId).getAuthorId())
+                                .targetId(postId)
+                                .content("favorited your post")
+                                .build()
+                ));
+            } catch (Exception e) {
+                log.error("Failed to send favorite event", e);
+            }
         }
-        
-        kafkaTemplate.send("user-events", "post_favorite", "User " + userId + " favorited " + postId);
     }
 }

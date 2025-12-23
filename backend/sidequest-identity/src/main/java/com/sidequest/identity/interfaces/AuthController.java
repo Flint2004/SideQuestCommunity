@@ -2,6 +2,7 @@ package com.sidequest.identity.interfaces;
 
 import com.sidequest.common.Result;
 import com.sidequest.identity.application.UserService;
+import com.sidequest.identity.interfaces.dto.LoginVO;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,9 +23,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public Result<String> login(@RequestBody LoginRequest request) {
-        String token = userService.login(request.getUsername(), request.getPassword());
-        return Result.success(token);
+    public Result<LoginVO> login(@RequestBody LoginRequest request) {
+        return Result.success(userService.login(request.getUsername(), request.getPassword()));
     }
 
     @Data

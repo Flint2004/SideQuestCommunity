@@ -6,6 +6,7 @@ import com.sidequest.identity.infrastructure.JwtUtils;
 import com.sidequest.identity.domain.User;
 import com.sidequest.identity.domain.UserRepository;
 import com.sidequest.identity.infrastructure.*;
+import com.sidequest.identity.interfaces.dto.LoginVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -123,7 +124,7 @@ public class UserService {
                 .eq(FollowDO::getFollowingId, followingId)) > 0;
     }
 
-    public String login(String username, String password) {
+    public LoginVO login(String username, String password) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
@@ -139,7 +140,14 @@ public class UserService {
             throw new RuntimeException("User account deleted");
         }
         
-        return jwtUtils.generateToken(user.getId().toString(), user.getRole());
+        String token = jwtUtils.generateToken(user.getId().toString(), user.getRole());
+        return LoginVO.builder()
+                .token(token)
+                .expireIn(86400L) // 假设 24 小时
+                .userId(user.getId())
+                .nickname(user.getNickname())
+                .avatar(user.getAvatar())
+                .build();
     }
 }
 
