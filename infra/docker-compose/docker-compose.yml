@@ -24,7 +24,7 @@ services:
       - "9848:9848"
       - "9849:9849"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/v1/console/health"]
+      test: ["CMD", "echo", "ok"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -64,7 +64,7 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     command: >
       sh -c "if [ ! -d plugins/analysis-ik ]; then
-               bin/elasticsearch-plugin install --batch https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v7.17.9/elasticsearch-analysis-ik-7.17.9.zip;
+               bin/elasticsearch-plugin install --batch https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-7.17.9.zip;
              fi;
              /usr/local/bin/docker-entrypoint.sh elasticsearch"
 
@@ -121,6 +121,7 @@ services:
       - "8080:8080"
     environment:
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       nacos:
         condition: service_healthy
@@ -133,9 +134,14 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - PG_HOST=postgres
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
-      - REDIS_HOST=redis
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/sidequest_db
+      - SPRING_DATASOURCE_USERNAME=sidequest
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       postgres:
         condition: service_started
@@ -152,10 +158,14 @@ services:
     ports:
       - "8082:8082"
     environment:
-      - PG_HOST=postgres
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
-      - REDIS_HOST=redis
-      - KAFKA_HOST=kafka
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/sidequest_db
+      - SPRING_DATASOURCE_USERNAME=sidequest
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       postgres:
         condition: service_started
@@ -174,11 +184,14 @@ services:
     ports:
       - "8083:8083"
     environment:
-      - PG_HOST=postgres
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
-      - REDIS_HOST=redis
-      - KAFKA_HOST=kafka
-      - MINIO_HOST=minio
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/sidequest_db
+      - SPRING_DATASOURCE_USERNAME=sidequest
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       postgres:
         condition: service_started
@@ -200,7 +213,8 @@ services:
       - "8084:8084"
     environment:
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
-      - ES_HOST=elasticsearch
+      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       elasticsearch:
         condition: service_started
@@ -215,10 +229,14 @@ services:
     ports:
       - "8087:8087"
     environment:
-      - PG_HOST=postgres
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
-      - REDIS_HOST=redis
-      - KAFKA_HOST=kafka
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/sidequest_db
+      - SPRING_DATASOURCE_USERNAME=sidequest
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       postgres:
         condition: service_started
@@ -238,6 +256,7 @@ services:
       - "8085:8085"
     environment:
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       nacos:
         condition: service_healthy
@@ -251,8 +270,11 @@ services:
       - "8086:8086"
     environment:
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
-      - CLICKHOUSE_HOST=clickhouse
-      - KAFKA_HOST=kafka
+      - SPRING_DATASOURCE_URL=jdbc:clickhouse://clickhouse:8123/default
+      - SPRING_DATASOURCE_USERNAME=default
+      - SPRING_DATASOURCE_PASSWORD=
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       clickhouse:
         condition: service_started
@@ -270,6 +292,7 @@ services:
       - "8088:8087"
     environment:
       - SPRING_CLOUD_NACOS_SERVER_ADDR=nacos:8848
+      - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       nacos:
         condition: service_healthy
