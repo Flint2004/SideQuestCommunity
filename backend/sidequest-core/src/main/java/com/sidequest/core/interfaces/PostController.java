@@ -7,6 +7,9 @@ import com.sidequest.core.domain.Post;
 import com.sidequest.core.infrastructure.PostDO;
 import com.sidequest.core.interfaces.dto.CreatePostDTO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,8 +31,8 @@ public class PostController {
 
     @GetMapping("/posts")
     public Result<Page<PostVO>> listPosts(
-            @RequestParam(defaultValue = "1") int current,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "1") @Min(1) int current,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @RequestParam(required = false) Long sectionId,
             @RequestParam(required = false) String tag) {
         String userId = UserContext.getUserId();
@@ -54,10 +57,9 @@ public class PostController {
     }
 
     @PostMapping("/posts")
-    public Result<String> createPost(@RequestBody CreatePostDTO dto) {
-        // 解耦：Controller 只负责接收 DTO 并转换为领域对象或调用 Application Service
-        // 遵循依赖倒置原则
+    public Result<String> createPost(@Valid @RequestBody CreatePostDTO dto) {
         String userId = UserContext.getUserId();
+        if (userId == null) return Result.error(401, "Unauthorized");
         
         postService.handleCreatePost(userId, dto);
         return Result.success("Post created successfully");

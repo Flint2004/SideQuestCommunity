@@ -1,10 +1,14 @@
 package com.sidequest.media.interfaces;
 
 import com.sidequest.common.Result;
+import com.sidequest.common.context.UserContext;
 import com.sidequest.media.application.MediaService;
 import com.sidequest.media.domain.Danmaku;
+import com.sidequest.media.infrastructure.DanmakuDO;
 import com.sidequest.media.infrastructure.MediaDO;
+import com.sidequest.media.interfaces.dto.DanmakuRequest;
 import com.sidequest.media.interfaces.dto.DanmakuVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -36,10 +40,35 @@ public class MediaController {
     }
 
     @PostMapping("/danmaku")
-    public Result<String> sendDanmaku(@RequestBody Danmaku danmaku) {
-        // 使用 Redis ZSet 存储弹幕，Score 为视频偏移时间
-        String key = "danmaku:" + danmaku.getVideoId();
+    public Result<String> sendDanmaku(@Valid @RequestBody DanmakuRequest request) {
+        String userIdStr = UserContext.getUserId();
+        if (userIdStr == null) {
+            return Result.error(401, "Unauthorized");
+        }
+        Long userId = Long.parseLong(userIdStr);
+
+        DanmakuDO danmakuDO = new DanmakuDO();
+        BeanUtils.copyProperties(request, danmakuDO);
+        danmakuDO.setUserId(userId);
+
+        // 1. 持久化到数据库
+        mediaService.saveDanmaku(danmakuDO);
+
+        // 2. 存储到 Redis ZSet，Score 为视频偏移时间，用于快速检索
+        String key = "danmaku:" + request.getVideoId();
+        // 构造领域模型用于缓存
+        Danmaku danmaku = Danmaku.builder()
+                .id(danmakuDO.getId())
+                .videoId(danmakuDO.getVideoId())
+                .userId(danmakuDO.getUserId())
+                .content(danmakuDO.getContent())
+                .timeOffsetMs(danmakuDO.getTimeOffsetMs())
+                .color(danmakuDO.getColor())
+                .createTime(danmakuDO.getCreateTime())
+                .build();
+        
         redisTemplate.opsForZSet().add(key, danmaku, danmaku.getTimeOffsetMs());
+        
         return Result.success("Danmaku sent");
     }
 

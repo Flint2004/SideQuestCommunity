@@ -72,6 +72,15 @@ public class PostService {
     private PostVO convertToVO(PostDO doItem, String currentUserId) {
         PostVO vo = new PostVO();
         BeanUtils.copyProperties(doItem, vo);
+        
+        // 处理图片和标签的转换
+        if (doItem.getImageUrls() != null && !doItem.getImageUrls().isEmpty()) {
+            vo.setImageUrls(List.of(doItem.getImageUrls().split(",")));
+        }
+        if (doItem.getTags() != null && !doItem.getTags().isEmpty()) {
+            vo.setTags(List.of(doItem.getTags().split(",")));
+        }
+
         if (currentUserId != null) {
             Long uid = Long.parseLong(currentUserId);
             vo.setHasLiked(likeMapper.selectCount(new LambdaQueryWrapper<LikeDO>().eq(LikeDO::getPostId, doItem.getId()).eq(LikeDO::getUserId, uid)) > 0);

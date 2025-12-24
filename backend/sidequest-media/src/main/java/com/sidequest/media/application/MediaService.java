@@ -1,18 +1,22 @@
 package com.sidequest.media.application;
 
 import com.sidequest.media.domain.Media;
+import com.sidequest.media.infrastructure.DanmakuDO;
 import com.sidequest.media.infrastructure.MediaDO;
+import com.sidequest.media.infrastructure.mapper.DanmakuMapper;
 import com.sidequest.media.infrastructure.mapper.MediaMapper;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import java.util.List;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -24,6 +28,7 @@ public class MediaService {
     
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final MediaMapper mediaMapper;
+    private final DanmakuMapper danmakuMapper;
     
     @Value("${minio.endpoint:http://localhost:9000}")
     private String endpoint;
@@ -87,6 +92,12 @@ public class MediaService {
             mediaMapper.updateById(mediaDO);
             log.info("Successfully updated media status for {}: {}", mediaId, status);
         }
+    }
+
+    public void saveDanmaku(DanmakuDO danmakuDO) {
+        danmakuDO.setCreateTime(LocalDateTime.now());
+        danmakuMapper.insert(danmakuDO);
+        log.info("Successfully saved danmaku to DB for video {}: {}", danmakuDO.getVideoId(), danmakuDO.getContent());
     }
 }
 
