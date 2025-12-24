@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="sidequest-identity" />
+        <module name="sidequest-search" />
+        <module name="sidequest-chat" />
+        <module name="sidequest-config" />
+        <module name="sidequest-media" />
+        <module name="sidequest-analytics" />
+        <module name="sidequest-moderation" />
+        <module name="sidequest-mcp" />
+        <module name="sidequest-gateway" />
+        <module name="sidequest-common" />
+        <module name="sidequest-core" />
+      </profile>
+    </annotationProcessing>
+  </component>
+</project>

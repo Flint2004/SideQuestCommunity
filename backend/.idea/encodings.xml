@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/sidequest-analytics/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-analytics/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-chat/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-chat/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-common/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-common/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-config/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-config/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-core/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-core/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-gateway/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-gateway/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-identity/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-identity/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-mcp/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-mcp/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-media/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-media/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-moderation/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-moderation/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-search/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sidequest-search/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
+  </component>
+</project>
