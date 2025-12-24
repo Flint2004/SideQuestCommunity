@@ -1,23 +1,32 @@
 # Side Quest 社区项目部署与数据库指南
 
-## 1. 基础设施准备 (Docker)
+## 1. 基础设施与微服务启动 (Docker)
 
-使用项目根目录下的 `infra/docker-compose/docker-compose.yml` 启动中间件：
+项目提供了一键启动中间件及微服务的 `docker-compose.yml`。
 
+### 1.1 一键启动全量服务
+在项目根目录下执行：
 ```bash
 cd infra/docker-compose
-docker-compose up -d
+docker-compose up -d --build
+```
+该命令会自动构建所有 Java 微服务镜像并启动中间件。
+
+### 1.2 分阶段启动 (推荐)
+如果资源有限，建议先启动中间件，待其就绪后再启动微服务。
+
+**第一步：启动中间件**
+```bash
+docker-compose up -d postgres nacos redis kafka elasticsearch minio clickhouse
 ```
 
-包含服务：
-- **PostgreSQL 15**: 核心业务库 (端口 5432)
-- **Redis 7.0**: 缓存与实时弹幕 (端口 6379)
-- **Kafka 3.4**: 事件驱动总线 (端口 9092)
-- **Elasticsearch 7.17**: 全文检索 (端口 9200)
-- **Nacos 2.2.3**: 配置中心与服务发现 (端口 8848)
-- **MinIO**: 对象存储 (端口 9000/9001)
-- **ClickHouse**: 分析型数据库 (端口 8123)
-- **Grafana LGTM Stack**: 可观测性 (Prometheus: 9090, Grafana: 3000, Loki: 3100, Tempo: 3200)
+**第二步：执行数据库初始化**
+参考 [第 2 节](#2-数据库初始化-postgresql) 初始化表结构。
+
+**第三步：启动微服务与前端**
+```bash
+docker-compose up -d gateway-service identity-service core-service media-service search-service chat-service moderation-service analytics-service mcp-service nginx
+```
 
 ## 2. 数据库初始化 (PostgreSQL)
 
@@ -25,30 +34,52 @@ docker-compose up -d
 
 ### 2.1 用户与身份 (sidequest-identity)
 ```sql
-CREATE TABLE t_user (
+CREATE TABLE IF NOT EXISTS t_user (
     id BIGSERIAL PRIMARY KEY,
     username VARCHAR(64) UNIQUE NOT NULL,
     password VARCHAR(128) NOT NULL,
     nickname VARCHAR(64),
     avatar VARCHAR(255),
+    role VARCHAR(20) DEFAULT 'USER',
     status INT DEFAULT 0, -- 0:正常, 1:封禁
+    follower_count INT DEFAULT 0,
+    following_count INT DEFAULT 0,
+    total_liked_count INT DEFAULT 0,
+    post_count INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS t_follow (
+    id BIGSERIAL PRIMARY KEY,
+    follower_id BIGINT NOT NULL,
+    following_id BIGINT NOT NULL,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(follower_id, following_id)
 );
 ```
 
 ### 2.2 社区核心 (sidequest-core)
 ```sql
-CREATE TABLE t_post (
+CREATE TABLE IF NOT EXISTS t_post (
     id BIGSERIAL PRIMARY KEY,
     author_id BIGINT NOT NULL,
+    author_name VARCHAR(64),
     title VARCHAR(255),
     content TEXT,
     section_id BIGINT,
     status INT DEFAULT 0, -- 0:发布, 1:草稿, 2:删除
-    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    like_count INT DEFAULT 0,
+    comment_count INT DEFAULT 0,
+    favorite_count INT DEFAULT 0,
+    view_count INT DEFAULT 0,
+    image_urls TEXT,
+    video_url VARCHAR(255),
+    tags VARCHAR(255),
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE t_comment (
+CREATE TABLE IF NOT EXISTS t_comment (
     id BIGSERIAL PRIMARY KEY,
     post_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
@@ -57,15 +88,23 @@ CREATE TABLE t_comment (
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE t_rating (
+CREATE TABLE IF NOT EXISTS t_like (
     id BIGSERIAL PRIMARY KEY,
     post_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
-    score INT CHECK (score >= 1 AND score <= 5),
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(post_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS t_favorite (
+    id BIGSERIAL PRIMARY KEY,
+    post_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    collection_id BIGINT,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE t_section (
+CREATE TABLE IF NOT EXISTS t_section (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(64) NOT NULL,
     display_name_zh VARCHAR(64),
@@ -74,7 +113,7 @@ CREATE TABLE t_section (
     status INT DEFAULT 0 -- 0: 正常, 1: 隐藏
 );
 
-CREATE TABLE t_tag (
+CREATE TABLE IF NOT EXISTS t_tag (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(64) UNIQUE NOT NULL,
     hit_count BIGINT DEFAULT 0
@@ -83,23 +122,53 @@ CREATE TABLE t_tag (
 
 ### 2.3 媒体处理 (sidequest-media)
 ```sql
-CREATE TABLE t_media (
+CREATE TABLE IF NOT EXISTS t_media (
     id BIGSERIAL PRIMARY KEY,
     file_name VARCHAR(255),
     file_key VARCHAR(255),
-    file_type VARCHAR(32),
+    file_type VARCHAR(32), -- image, video
+    url VARCHAR(512),
     author_id BIGINT,
-    status INT DEFAULT 0,
+    status INT DEFAULT 0, -- 0: PROCESSING, 1: READY, 2: FAILED
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE t_danmaku (
+CREATE TABLE IF NOT EXISTS t_danmaku (
     id BIGSERIAL PRIMARY KEY,
     video_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     content TEXT,
     time_offset_ms BIGINT,
     color VARCHAR(16),
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### 2.4 即时通讯 (sidequest-chat)
+```sql
+CREATE TABLE IF NOT EXISTS t_chat_room (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(64),
+    type VARCHAR(20), -- PRIVATE, GROUP
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS t_chat_room_member (
+    id BIGSERIAL PRIMARY KEY,
+    room_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    last_read_message_id BIGINT DEFAULT 0,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(room_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS t_chat_message (
+    id BIGSERIAL PRIMARY KEY,
+    room_id BIGINT NOT NULL,
+    sender_id BIGINT NOT NULL,
+    content TEXT,
+    type VARCHAR(20), -- TEXT, IMAGE, VIDEO
+    status INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -140,6 +209,8 @@ spring:
 系统启动前需确保 Kafka 中存在以下 Topic：
 - `post-topic`: 帖子发布事件 (3 分片, 1 副本)
 - `user-events`: 埋点事件 (6 分片, 1 副本)
+- `video-process-topic`: 视频处理任务 (3 分片, 1 副本)
+- `chat-message-topic`: 聊天消息转发 (3 分片, 1 副本)
 
 ### 4.2 Elasticsearch 索引
 创建 `posts` 索引并配置 IK 分词器：
@@ -152,9 +223,40 @@ PUT /posts
 }
 ```
 
-## 5. 微服务启动顺序
-1. `sidequest-config` (Nacos)
-2. `sidequest-gateway`
-3. `sidequest-identity`
-4. 其他业务服务 (`core`, `media`, `search`, `moderation`, `analytics`, `mcp`)
+## 5. (可选) 本地手动构建与启动
+
+如果你不希望使用 Docker 运行微服务，也可以在本地手动启动。
+
+### 5.1 编译打包
+在 `backend` 目录下执行 Maven 编译：
+```bash
+cd backend
+mvn clean install -DskipTests
+```
+
+### 5.2 启动顺序
+建议按照以下顺序启动服务，以确保依赖关系正确：
+
+1.  **sidequest-gateway** (网关, 端口 8080): 统一入口。
+2.  **sidequest-identity** (用户/鉴权, 端口 8081): 核心依赖。
+3.  **sidequest-core** (社区核心, 端口 8082): 核心业务。
+4.  **其他业务服务**:
+    *   `sidequest-media` (媒体处理, 端口 8083)
+    *   `sidequest-search` (搜索服务, 端口 8084)
+    *   `sidequest-moderation` (内容审核, 端口 8085)
+    *   `sidequest-analytics` (数据分析, 端口 8086)
+    *   `sidequest-chat` (即时通讯, 端口 8087)
+    *   `sidequest-mcp` (AI 工具集成, 端口 8087 - *注：本地运行需注意端口冲突*)
+
+### 5.3 启动命令示例
+在各服务目录下运行：
+```bash
+java -jar target/sidequest-xxx-1.0.0-SNAPSHOT.jar
+```
+或者在 IDE 中直接运行各服务的 `Application` 类。
+
+## 6. 验证部署
+- **网关检查**: 访问 `http://localhost:8080/actuator/health`
+- **Nacos 控制台**: 登录 `http://localhost:8848/nacos` (默认账号: nacos/nacos)，检查服务是否全部注册成功。
+- **Swagger UI** (如果开启): `http://localhost:8081/swagger-ui/index.html` (各服务端口不同)
 
