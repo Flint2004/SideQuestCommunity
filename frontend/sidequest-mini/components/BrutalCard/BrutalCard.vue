@@ -17,11 +17,11 @@
     <view class="content">
       <text class="title">{{ post.title }}</text>
       <view class="footer">
-        <view class="author">
+        <view class="author" @click.stop="$emit('user-click', post.authorId)">
           <image :src="post.authorAvatar || '/static/default-avatar.png'" class="avatar" />
           <text class="author-name">{{ post.authorName }}</text>
         </view>
-        <view class="likes" @click.stop="toggleLike">
+        <view class="likes" @click.stop="$emit('like', post.id)">
           <svg width="28" height="28" viewBox="0 0 24 24" 
                :fill="post.hasLiked ? 'var(--accent-red)' : 'none'" 
                :stroke="post.hasLiked ? 'var(--accent-red)' : 'currentColor'" 
@@ -46,9 +46,8 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['click', 'like'])
+const emit = defineEmits(['click', 'like', 'user-click'])
 
-// Image size handling
 const imgWidth = ref(0)
 const imgHeight = ref(0)
 
@@ -58,20 +57,22 @@ const onImageLoad = (e) => {
 }
 
 const cardHeight = computed(() => {
-  // Constraints: 3:4 to 4:3
-  // 3:4 = 0.75, 4:3 = 1.33
-  if (!imgWidth.value || !imgHeight.value) return 400 // default height
+  if (!imgWidth.value || !imgHeight.value) {
+    // 检查是否有 mock 数据中的宽高信息
+    const match = props.post.imageUrls[0]?.match(/_w(\d+)_h(\d+)/)
+    if (match) {
+      const w = parseInt(match[1])
+      const h = parseInt(match[2])
+      const ratio = h / w
+      return 340 * Math.max(0.75, Math.min(1.33, ratio))
+    }
+    return 400
+  }
   
   const ratio = imgHeight.value / imgWidth.value
   const constrainedRatio = Math.max(0.75, Math.min(1.33, ratio))
-  
-  // Base width for card is roughly 340rpx (half screen minus margins)
   return 340 * constrainedRatio
 })
-
-const toggleLike = () => {
-  emit('like', props.post.id)
-}
 </script>
 
 <style lang="scss" scoped>
@@ -98,9 +99,10 @@ const toggleLike = () => {
 
 .content {
   padding: 16rpx;
+  background-color: var(--surface); // 确保卡片背景色正确
   
   .title {
-    font-size: 26rpx;
+    font-size: 28rpx;
     font-weight: 800;
     line-height: 1.4;
     display: -webkit-box;
@@ -108,6 +110,7 @@ const toggleLike = () => {
     -webkit-line-clamp: 2;
     overflow: hidden;
     margin-bottom: 16rpx;
+    color: var(--text-main); // 修复黑夜模式字体颜色
   }
   
   .footer {
@@ -128,9 +131,10 @@ const toggleLike = () => {
       }
       
       .author-name {
-        font-size: 20rpx;
-        font-weight: 600;
+        font-size: 22rpx;
+        font-weight: 700;
         opacity: 0.7;
+        color: var(--text-main); // 修复黑夜模式字体颜色
       }
     }
     
@@ -139,9 +143,10 @@ const toggleLike = () => {
       align-items: center;
       
       .like-count {
-        font-size: 22rpx;
+        font-size: 24rpx;
         font-weight: 800;
         margin-left: 4rpx;
+        color: var(--text-main); // 修复黑夜模式字体颜色
         
         &.liked {
           color: var(--accent-red);
@@ -153,7 +158,7 @@ const toggleLike = () => {
 
 @keyframes heart-pop {
   0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
+  50% { transform: scale(1.6); }
   100% { transform: scale(1); }
 }
 
@@ -161,4 +166,3 @@ const toggleLike = () => {
   animation: heart-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 </style>
-

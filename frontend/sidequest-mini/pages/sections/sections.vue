@@ -1,11 +1,12 @@
 <template>
   <view :class="{ 'dark': isDark }" class="page-container">
-    <view class="custom-header">
-      <view class="status-bar" :style="{ height: statusBarHeight + 'px' }" />
-      <view class="nav-bar">
-        <text class="title">游戏分区</text>
-      </view>
-    </view>
+    <BrutalHeader 
+      :isDark="isDark" 
+      :activeTab="1" 
+      :tabs="['游戏分区']"
+      @toggle-dark="toggleDark"
+      @search="goToSearch"
+    />
     
     <scroll-view scroll-y class="content-scroll">
       <view v-if="!selectedSection" class="section-grid">
@@ -55,6 +56,7 @@
     </scroll-view>
     
     <BrutalTabBar activeTab="sections" />
+    <LoginModal />
   </view>
 </template>
 
@@ -62,22 +64,17 @@
 import { ref, onMounted } from 'vue'
 import BrutalCard from '@/components/BrutalCard/BrutalCard.vue'
 import BrutalTabBar from '@/components/BrutalTabBar/BrutalTabBar.vue'
+import BrutalHeader from '@/components/BrutalHeader/BrutalHeader.vue'
 import request from '@/utils/request'
 
 const isDark = ref(uni.getStorageSync('isDark') || false)
-const statusBarHeight = ref(0)
 const sections = ref([])
 const selectedSection = ref(null)
-const posts = ref([])
 const leftColumnPosts = ref([])
 const rightColumnPosts = ref([])
-let leftHeight = 0
-let rightHeight = 0
+let leftHeight = 0; let rightHeight = 0
 
 onMounted(async () => {
-  const sys = uni.getSystemInfoSync()
-  statusBarHeight.value = sys.statusBarHeight
-  
   try {
     const data = await request({ url: '/api/core/sections' })
     sections.value = data
@@ -85,141 +82,38 @@ onMounted(async () => {
 })
 
 const selectSection = async (section) => {
-  selectedSection.value = section
-  leftColumnPosts.value = []
-  rightColumnPosts.value = []
-  leftHeight = 0
-  rightHeight = 0
-  
+  selectedSection.value = section; leftColumnPosts.value = []; rightColumnPosts.value = []; leftHeight = 0; rightHeight = 0
   try {
-    const data = await request({ 
-      url: `/api/core/posts?sectionId=${section.id}&size=20` 
-    })
-    distributePosts(data.records.map(p => {
-      let urls = p.imageUrls
-      if (typeof urls === 'string') {
-        try { urls = JSON.parse(urls) } catch (e) { urls = [urls] }
-      }
-      return { ...p, imageUrls: urls }
-    }))
+    const data = await request({ url: `/api/core/posts?sectionId=${section.id}&size=20` })
+    distributePosts(data.records.map(p => ({
+      ...p, imageUrls: typeof p.imageUrls === 'string' ? JSON.parse(p.imageUrls) : (p.imageUrls || [])
+    })))
   } catch (err) {}
 }
 
 const distributePosts = (newPosts) => {
   newPosts.forEach(post => {
-    let h = 400
-    const match = post.imageUrls[0]?.match(/_w(\d+)_h(\d+)/)
-    if (match) {
-      const w = parseInt(match[1])
-      const h_orig = parseInt(match[2])
-      const ratio = h_orig / w
-      const constrainedRatio = Math.max(0.75, Math.min(1.33, ratio))
-      h = 340 * constrainedRatio
-    }
-    
-    if (leftHeight <= rightHeight) {
-      leftColumnPosts.value.push(post)
-      leftHeight += h
-    } else {
-      rightColumnPosts.value.push(post)
-      rightHeight += h
-    }
+    const match = post.imageUrls[0]?.match(/_w(\d+)_h(\d+)/); const h = match ? 340 * Math.max(0.75, Math.min(1.33, match[2]/match[1])) : 400
+    if (leftHeight <= rightHeight) { leftColumnPosts.value.push(post); leftHeight += h }
+    else { rightColumnPosts.value.push(post); rightHeight += h }
   })
 }
 
-const goToDetail = (id) => {
-  uni.navigateTo({ url: `/pages/post-detail/post-detail?id=${id}` })
-}
+const toggleDark = () => { isDark.value = !isDark.value; uni.setStorageSync('isDark', isDark.value) }
+const goToSearch = () => uni.navigateTo({ url: '/pages/search/search' })
+const goToDetail = (id) => uni.navigateTo({ url: `/pages/post-detail/post-detail?id=${id}` })
 </script>
 
 <style lang="scss" scoped>
-.page-container {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--bg-main);
+.page-container { height: 100vh; display: flex; flex-direction: column; background-color: var(--bg-main); }
+.content-scroll { flex: 1; }
+.section-grid { display: grid; grid-template-columns: 1fr 1fr; padding: 30rpx; gap: 30rpx; }
+.section-card { padding: 40rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: var(--surface);
+  .section-name { font-size: 32rpx; font-weight: 800; margin-bottom: 8rpx; }
+  .section-en { font-size: 20rpx; font-weight: 600; opacity: 0.5; text-transform: uppercase; }
 }
-
-.custom-header {
-  background-color: var(--surface);
-  border-bottom: 4rpx solid var(--border-color);
-  
-  .nav-bar {
-    height: 100rpx;
-    display: flex;
-    align-items: center;
-    padding: 0 30rpx;
-    
-    .title {
-      font-size: 36rpx;
-      font-weight: 800;
-    }
-  }
+.filter-header { margin: 30rpx; padding: 20rpx 30rpx; display: flex; justify-content: space-between; align-items: center; background-color: var(--primary); 
+  .filter-title { font-size: 32rpx; font-weight: 800; color: #fff; } .close-btn { padding: 10rpx; color: #fff; }
 }
-
-.content-scroll {
-  flex: 1;
-}
-
-.section-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 30rpx;
-  gap: 30rpx;
-}
-
-.section-card {
-  padding: 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  
-  .section-name {
-    font-size: 32rpx;
-    font-weight: 800;
-    margin-bottom: 8rpx;
-  }
-  
-  .section-en {
-    font-size: 20rpx;
-    font-weight: 600;
-    opacity: 0.5;
-    text-transform: uppercase;
-  }
-}
-
-.filter-header {
-  margin: 30rpx;
-  padding: 20rpx 30rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: var(--primary);
-  color: #fff;
-  
-  .filter-title {
-    font-size: 32rpx;
-    font-weight: 800;
-  }
-  
-  .close-btn {
-    padding: 10rpx;
-  }
-}
-
-.waterfall {
-  display: flex;
-  padding: 0 20rpx;
-  gap: 20rpx;
-  
-  .column {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 20rpx;
-  }
-}
+.waterfall { display: flex; padding: 0 20rpx; gap: 20rpx; .column { flex: 1; display: flex; flex-direction: column; gap: 20rpx; } }
 </style>
-

@@ -33,7 +33,7 @@
         
         <view class="action-row">
           <button v-if="!user.id" class="brutal-btn primary login-btn" @click="goToLogin">去登录</button>
-          <button v-else class="brutal-btn edit-btn">编辑资料</button>
+          <button v-else class="brutal-btn edit-btn" @click="goToEdit">编辑资料</button>
         </view>
       </view>
       
@@ -70,6 +70,7 @@
     </scroll-view>
     
     <BrutalTabBar activeTab="me" />
+    <LoginModal />
   </view>
 </template>
 
@@ -146,7 +147,11 @@ const distributePosts = (newPosts) => {
 }
 
 const goToLogin = () => {
-  uni.navigateTo({ url: '/pages/login/login' })
+  bus.openLogin()
+}
+
+const goToEdit = () => {
+  uni.navigateTo({ url: '/pages/me/edit' })
 }
 </script>
 

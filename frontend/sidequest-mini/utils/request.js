@@ -1,7 +1,64 @@
 // utils/request.js
-const BASE_URL = 'http://localhost:8080' // 网关地址
+import { IS_LOGGED_IN, mockPosts, mockSections, mockUserInfo, mockUnreadCounts, mockChatRooms, mockOtherUser, mockChatMessages, mockComments } from './mock'
+import { bus } from './bus'
+
+const BASE_URL = 'http://localhost:8080'
+const USE_MOCK = true 
 
 const request = (options) => {
+  if (USE_MOCK) {
+    return new Promise((resolve) => {
+      console.log(`[Mock Request]: ${options.url}`)
+      
+      // 模拟 Token 逻辑
+      if (IS_LOGGED_IN && !uni.getStorageSync('token')) {
+        uni.setStorageSync('token', 'mock_token_123456')
+        uni.setStorageSync('userInfo', mockUserInfo)
+      }
+
+      setTimeout(() => {
+        if (options.url.includes('/api/core/interactions/comments')) {
+          resolve(mockComments)
+        } else if (options.url.includes('/api/core/posts/')) {
+          const id = parseInt(options.url.split('/').pop())
+          const post = mockPosts.find(p => p.id === id) || mockPosts[0]
+          resolve(post)
+        } else if (options.url.includes('/api/core/posts')) {
+          resolve({ records: mockPosts, total: mockPosts.length })
+        } else if (options.url.includes('/api/core/sections')) {
+          resolve(mockSections)
+        } else if (options.url.includes('/api/identity/me')) {
+          resolve(mockUserInfo)
+        } else if (options.url.includes('/api/identity/users/') && options.url.includes('/public')) {
+          resolve(mockOtherUser)
+        } else if (options.url.includes('/api/notifications/unread-count')) {
+          resolve({ chat: 2, interaction: 5, system: 0 })
+        } else if (options.url.includes('/api/chat/rooms') && options.url.includes('/messages')) {
+          resolve(mockChatMessages)
+        } else if (options.url.includes('/api/chat/rooms')) {
+          resolve([
+            {
+              id: 1,
+              recipientNickname: "野兽派小秘书",
+              recipientAvatar: "https://picsum.photos/100/100?random=20",
+              lastMessage: "欢迎来到新野兽主义的世界！",
+              lastMessageTime: new Date().toISOString(),
+              unreadCount: 1
+            }
+          ])
+        } else if (options.url.includes('/api/search/posts')) {
+          resolve({ content: mockPosts })
+        } else if (options.url.includes('/api/search/user/posts')) {
+          resolve({ content: mockPosts.filter(p => p.authorId === 102) })
+        } else if (options.url.includes('/api/media/upload-url')) {
+          resolve('http://localhost:8080/mock-upload-path')
+        } else {
+          resolve('mock success')
+        }
+      }, 300)
+    })
+  }
+
   return new Promise((resolve, reject) => {
     const token = uni.getStorageSync('token')
     
@@ -17,8 +74,7 @@ const request = (options) => {
         if (res.data.code === 200) {
           resolve(res.data.data)
         } else if (res.data.code === 401) {
-          // Token expired, handle login
-          uni.navigateTo({ url: '/pages/login/login' })
+          bus.openLogin()
           reject(res.data)
         } else {
           uni.showToast({
@@ -40,4 +96,3 @@ const request = (options) => {
 }
 
 export default request
-

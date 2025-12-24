@@ -1,0 +1,28 @@
+{
+  "name": "sidequest-mini",
+  "version": "1.0.0",
+  "description": "SideQuest Community Mini App",
+  "scripts": {
+    "dev:h5": "uni",
+    "build:h5": "uni build",
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "3.0.0-alpha-4010620240426001",
+    "@dcloudio/uni-app-plus": "3.0.0-alpha-4010620240426001",
+    "@dcloudio/uni-components": "3.0.0-alpha-4010620240426001",
+    "@dcloudio/uni-h5": "3.0.0-alpha-4010620240426001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-4010620240426001",
+    "vue": "^3.2.45",
+    "vue-i18n": "^9.1.9"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.3.2",
+    "@dcloudio/uni-cli-shared": "3.0.0-alpha-4010620240426001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-4010620240426001",
+    "sass": "^1.56.1",
+    "vite": "^4.0.0"
+  }
+}
+

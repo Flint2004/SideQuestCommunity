@@ -6,7 +6,7 @@
         :key="index"
         class="tab-item"
         :class="{ 'active': activeTab === item.key }"
-        @click="switchTab(item.key)"
+        @click="handleNav(item.key)"
       >
         <template v-if="item.key === 'publish'">
           <view class="publish-btn">
@@ -17,7 +17,10 @@
           </view>
         </template>
         <template v-else>
-          <text class="tab-label">{{ item.label }}</text>
+          <view class="label-box">
+            <text class="tab-label">{{ item.label }}</text>
+            <view v-if="item.key === 'message' && bus.unreadCount > 0" class="red-dot">{{ bus.unreadCount }}</view>
+          </view>
           <view v-if="activeTab === item.key" class="active-indicator" />
         </template>
       </view>
@@ -26,16 +29,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { bus } from '@/utils/bus'
+import request from '@/utils/request'
+import { onMounted } from 'vue'
 
 const props = defineProps({
-  activeTab: {
-    type: String,
-    default: 'home'
-  }
+  activeTab: { type: String, default: 'home' }
 })
-
-const emit = defineEmits(['change'])
 
 const tabs = [
   { label: '首页', key: 'home' },
@@ -45,84 +45,36 @@ const tabs = [
   { label: '我', key: 'me' }
 ]
 
-const switchTab = (key) => {
-  if (key === 'publish') {
-    uni.navigateTo({ url: '/pages/publish/publish' })
+onMounted(async () => {
+  const token = uni.getStorageSync('token')
+  if (token) {
+    try {
+      const data = await request({ url: '/api/notifications/unread-count' })
+      bus.updateUnreadCount(data.chat + data.interaction + data.system)
+    } catch (e) {}
+  }
+})
+
+const handleNav = (key) => {
+  const token = uni.getStorageSync('token')
+  if (['publish', 'message', 'me'].includes(key) && !token) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => bus.openLogin(), 800)
     return
   }
-  emit('change', key)
-  uni.switchTab({ url: `/pages/${key}/${key}` })
+  if (key === props.activeTab && key !== 'publish') return
+  const path = key === 'home' ? 'index' : key
+  uni.reLaunch({ url: `/pages/${path}/${path}` })
 }
 </script>
 
 <style lang="scss" scoped>
-.tab-bar-container {
-  position: fixed;
-  bottom: 40rpx;
-  left: 30rpx;
-  right: 30rpx;
-  z-index: 1000;
-}
-
-.tab-bar {
-  display: flex;
-  height: 110rpx;
-  background-color: var(--surface);
-  border: 4rpx solid var(--border-color);
-  box-shadow: 8rpx 8rpx 0px 0px #000;
-  border-radius: 60rpx;
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 20rpx;
-}
-
-.tab-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  position: relative;
-  
-  .tab-label {
-    font-size: 28rpx;
-    font-weight: 800;
-    color: var(--text-main);
-    transition: all 0.2s ease;
-  }
-  
-  &.active .tab-label {
-    color: var(--primary);
-    transform: scale(1.1);
-  }
-  
-  .active-indicator {
-    position: absolute;
-    bottom: 12rpx;
-    width: 30rpx;
-    height: 6rpx;
-    background-color: var(--text-main);
-    transform: skewX(-20deg);
-  }
-}
-
-.publish-btn {
-  width: 84rpx;
-  height: 84rpx;
-  background-color: var(--primary);
-  border: 4rpx solid var(--border-color);
-  box-shadow: 4rpx 4rpx 0px 0px #000;
-  border-radius: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  
-  &:active {
-    transform: translate(2rpx, 2rpx);
-    box-shadow: 2rpx 2rpx 0px 0px #000;
-  }
-}
+.tab-bar-container { position: fixed; bottom: 40rpx; left: 30rpx; right: 30rpx; z-index: 1000; }
+.tab-bar { display: flex; height: 110rpx; background: var(--surface); border: 4rpx solid #000; box-shadow: 8rpx 8rpx 0 #000; border-radius: 60rpx; align-items: center; justify-content: space-around; }
+.tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: relative; }
+.label-box { position: relative; .tab-label { font-size: 28rpx; font-weight: 800; color: var(--text-main); } }
+.red-dot { position: absolute; top: -10rpx; right: -25rpx; background: var(--accent-red); color: #fff; font-size: 18rpx; padding: 0 8rpx; border-radius: 20rpx; border: 2rpx solid #000; font-weight: 800; }
+.active .tab-label { color: var(--primary); transform: scale(1.1); }
+.active-indicator { position: absolute; bottom: 12rpx; width: 30rpx; height: 6rpx; background: #000; transform: skewX(-20deg); }
+.publish-btn { width: 84rpx; height: 84rpx; background: var(--primary); border: 4rpx solid #000; box-shadow: 4rpx 4rpx 0 #000; border-radius: 24rpx; display: flex; align-items: center; justify-content: center; color: #fff; &:active { transform: translate(2rpx, 2rpx); box-shadow: 2rpx 2rpx 0 #000; } }
 </style>
-

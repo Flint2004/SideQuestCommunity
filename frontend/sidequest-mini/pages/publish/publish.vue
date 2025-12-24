@@ -1,6 +1,15 @@
 <template>
   <view class="publish-page" :class="{ 'dark': isDark }">
-    <view class="media-section">
+    <view class="fixed-header">
+      <view class="status-bar" :style="{ height: statusBarHeight + 'px' }" />
+      <view class="nav-bar">
+        <view class="back-btn brutal-btn" @click="goBack"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="15 18 9 12 15 6"></polyline></svg></view>
+        <text class="title">发布新笔记</text>
+      </view>
+    </view>
+    
+    <scroll-view scroll-y class="content-scroll">
+      <view class="media-section">
       <view v-if="tempMedia" class="media-preview brutal-card">
         <image :src="tempMedia.path" mode="aspectFit" class="preview-img" />
         <view class="remove-btn" @click="tempMedia = null">✕</view>
@@ -34,11 +43,12 @@
             <text>{{ selectedSectionName || '选择分区' }}</text>
           </view>
         </picker>
-        <view class="selector brutal-btn" @click="showTagInput = true">
-          <text>{{ form.tags.length ? form.tags.join(', ') : '添加标签' }}</text>
+        <view class="selector brutal-btn tag-btn" @click="showTagInput = true">
+          <text class="tag-display-text">{{ form.tags.length ? form.tags.join(', ') : '添加标签' }}</text>
         </view>
       </view>
     </view>
+  </scroll-view>
     
     <view class="footer safe-area-bottom">
       <button class="brutal-btn primary submit-btn" :loading="submitting" @click="submit">
@@ -50,13 +60,16 @@
     <view v-if="showTagInput" class="modal-mask" @click="showTagInput = false">
       <view class="modal-content brutal-card" @click.stop>
         <text class="modal-title">添加标签</text>
-        <input v-model="newTag" class="brutal-input" placeholder="输入标签名..." @confirm="addTag" />
+        <view class="input-row">
+          <input v-model="newTag" class="brutal-input brutal-card" placeholder="输入标签名..." @confirm="addTag" />
+          <view class="add-tag-btn brutal-btn primary" @click="addTag">添加</view>
+        </view>
         <view class="tag-list">
           <view v-for="(tag, i) in form.tags" :key="i" class="tag-item brutal-card" @click="removeTag(i)">
-            {{ tag }} ✕
+            {{ tag }} <text class="close-icon">✕</text>
           </view>
         </view>
-        <button class="brutal-btn primary" @click="showTagInput = false">确定</button>
+        <button class="brutal-btn primary confirm-btn" @click="showTagInput = false">确定</button>
       </view>
     </view>
   </view>
@@ -67,6 +80,7 @@ import { ref, reactive, onMounted } from 'vue'
 import request from '@/utils/request'
 
 const isDark = ref(uni.getStorageSync('isDark') || false)
+const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight)
 const tempMedia = ref(null)
 const submitting = ref(false)
 const showTagInput = ref(false)
@@ -92,33 +106,66 @@ onMounted(async () => {
   } catch (err) {}
 })
 
+const goBack = () => {
+  const pages = getCurrentPages()
+  if (pages.length > 1) {
+    uni.navigateBack()
+  } else {
+    uni.reLaunch({ url: '/pages/index/index' })
+  }
+}
+
 const chooseMedia = () => {
-  uni.chooseMedia({
-    count: 1,
-    mediaType: ['image', 'video'],
-    success: async (res) => {
-      const file = res.tempFiles[0]
-      tempMedia.value = {
-        path: file.tempFilePath,
-        type: file.fileType,
-        size: file.size,
-        duration: file.duration || 0,
-        width: file.width || 0,
-        height: file.height || 0
-      }
-      
-      // If it's an image and width/height are missing, get them
-      if (file.fileType === 'image' && (!file.width || !file.height)) {
+  // H5 兼容性处理：优先使用 chooseImage，因为 chooseMedia 在部分 H5 环境不支持
+  const isH5 = typeof window !== 'undefined'
+  
+  if (isH5) {
+    uni.chooseImage({
+      count: 1,
+      success: (res) => {
+        const file = res.tempFiles[0]
+        tempMedia.value = {
+          path: file.path,
+          type: 'image',
+          size: file.size,
+          width: 0,
+          height: 0
+        }
         uni.getImageInfo({
-          src: file.tempFilePath,
+          src: file.path,
           success: (info) => {
             tempMedia.value.width = info.width
             tempMedia.value.height = info.height
           }
         })
       }
-    }
-  })
+    })
+  } else {
+    uni.chooseMedia({
+      count: 1,
+      mediaType: ['image', 'video'],
+      success: async (res) => {
+        const file = res.tempFiles[0]
+        tempMedia.value = {
+          path: file.tempFilePath,
+          type: file.fileType,
+          size: file.size,
+          duration: file.duration || 0,
+          width: file.width || 0,
+          height: file.height || 0
+        }
+        if (file.fileType === 'image' && (!file.width || !file.height)) {
+          uni.getImageInfo({
+            src: file.tempFilePath,
+            success: (info) => {
+              tempMedia.value.width = info.width
+              tempMedia.value.height = info.height
+            }
+          })
+        }
+      }
+    })
+  }
 }
 
 const onSectionChange = (e) => {
@@ -151,8 +198,18 @@ const submit = async () => {
   submitting.value = true
   try {
     // 1. Get Upload URL
-    // Carry size info in filename or metadata as per requirement
-    const ext = tempMedia.value.path.split('.').pop()
+    // H5 blob path doesn't have extension, default to jpg/mp4
+    let ext = 'jpg'
+    if (tempMedia.value.path.includes('.')) {
+      const parts = tempMedia.value.path.split('.')
+      const lastPart = parts.pop().toLowerCase()
+      if (['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'].includes(lastPart)) {
+        ext = lastPart
+      }
+    } else if (tempMedia.value.type === 'video') {
+      ext = 'mp4'
+    }
+    
     const fileName = `post_${Date.now()}_w${tempMedia.value.width}_h${tempMedia.value.height}.${ext}`
     
     const uploadUrl = await request({
@@ -184,8 +241,8 @@ const submit = async () => {
       method: 'POST',
       data: {
         ...form,
-        tags: JSON.stringify(form.tags),
-        imageUrls: JSON.stringify(form.imageUrls)
+        tags: form.tags,
+        imageUrls: form.imageUrls
       }
     })
     
@@ -203,18 +260,45 @@ const submit = async () => {
 
 <style lang="scss" scoped>
 .publish-page {
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   background-color: var(--bg-main);
-  padding: 30rpx;
+}
+
+.fixed-header { 
+  background: var(--surface); 
+  border-bottom: 4rpx solid #000; 
+  z-index: 100; 
+  .nav-bar { 
+    height: 100rpx; 
+    display: flex; 
+    align-items: center; 
+    padding: 0 30rpx; 
+    gap: 30rpx; 
+    .back-btn { width: 70rpx; height: 70rpx; border-radius: 16rpx; } 
+    .title { font-size: 32rpx; font-weight: 800; color: var(--text-main); } 
+  } 
+}
+
+.content-scroll {
+  flex: 1;
+  padding: 30rpx 40rpx 30rpx 30rpx;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .media-section {
+  width: 100%;
   margin-bottom: 40rpx;
+  box-sizing: border-box;
+  padding-right: 12rpx;
   
   .media-preview {
     width: 100%;
     height: 400rpx;
     position: relative;
+    box-sizing: border-box;
     
     .preview-img {
       width: 100%;
@@ -249,33 +333,54 @@ const submit = async () => {
 }
 
 .form-section {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 30rpx;
+  box-sizing: border-box;
+  padding-right: 12rpx;
   
   .brutal-input {
+    width: 100%;
     height: 100rpx;
     padding: 0 30rpx;
     font-size: 32rpx;
     font-weight: 800;
+    box-sizing: border-box;
   }
   
   .brutal-textarea {
+    width: 100%;
     height: 300rpx;
     padding: 30rpx;
     font-size: 28rpx;
     font-weight: 600;
+    box-sizing: border-box;
   }
 }
 
 .selector-group {
   display: flex;
   gap: 20rpx;
+  margin-bottom: 40rpx;
+  
+  picker {
+    flex: 2; // 分区占更多空间
+  }
   
   .selector {
-    flex: 1;
-    height: 80rpx;
-    font-size: 24rpx;
+    width: 100%;
+    height: 90rpx;
+    font-size: 26rpx;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 20rpx;
+  }
+  
+  .tag-btn {
+    flex: 3;
   }
 }
 
@@ -318,19 +423,44 @@ const submit = async () => {
     font-size: 36rpx;
     font-weight: 800;
   }
+
+  .input-row {
+    display: flex;
+    gap: 20rpx;
+    .brutal-input { flex: 1; height: 90rpx; padding: 0 20rpx; }
+    .add-tag-btn { width: 120rpx; height: 90rpx; font-size: 26rpx; }
+  }
   
   .tag-list {
     display: flex;
     flex-wrap: wrap;
     gap: 16rpx;
+    min-height: 100rpx;
     
     .tag-item {
       padding: 10rpx 20rpx;
       font-size: 24rpx;
       background: var(--primary);
       color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10rpx;
+      .close-icon { font-size: 20rpx; opacity: 0.8; }
     }
   }
+
+  .confirm-btn {
+    height: 90rpx;
+    width: 100%;
+  }
+}
+
+.tag-display-text {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 </style>
 
