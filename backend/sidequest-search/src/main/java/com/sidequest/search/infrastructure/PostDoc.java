@@ -20,6 +20,9 @@ public class PostDoc {
     
     @Field(type = FieldType.Keyword)
     private String authorName;
+
+    @Field(type = FieldType.Long)
+    private Long authorId;
     
     @Field(type = FieldType.Long)
     private Long sectionId;

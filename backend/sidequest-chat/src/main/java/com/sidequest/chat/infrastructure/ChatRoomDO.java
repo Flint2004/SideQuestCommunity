@@ -16,16 +16,3 @@ public class ChatRoomDO {
     private LocalDateTime createTime;
 }
 
-@Data
-@TableName("t_chat_message")
-public class ChatMessageDO {
-    @TableId(type = IdType.AUTO)
-    private Long id;
-    private Long roomId;
-    private Long senderId;
-    private String content;
-    private String type; // TEXT, IMAGE, etc.
-    private Integer status; // 0: UNREAD, 1: READ
-    private LocalDateTime createTime;
-}
-

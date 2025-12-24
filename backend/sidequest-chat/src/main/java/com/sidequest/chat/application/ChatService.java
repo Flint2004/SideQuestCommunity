@@ -4,20 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.sidequest.chat.infrastructure.ChatMessageDO;
 import com.sidequest.chat.infrastructure.ChatRoomDO;
-import com.sidequest.chat.infrastructure.mapper.ChatMessageMapper;
-import com.sidequest.chat.infrastructure.mapper.ChatRoomMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-import com.sidequest.chat.infrastructure.ChatMessageDO;
-import com.sidequest.chat.infrastructure.ChatRoomDO;
 import com.sidequest.chat.infrastructure.ChatRoomMemberDO;
 import com.sidequest.chat.infrastructure.feign.IdentityClient;
 import com.sidequest.chat.infrastructure.mapper.ChatMessageMapper;

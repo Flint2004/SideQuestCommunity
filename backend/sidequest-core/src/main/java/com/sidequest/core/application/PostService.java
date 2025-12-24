@@ -1,5 +1,7 @@
 package com.sidequest.core.application;
 
+import com.sidequest.core.domain.Post;
+import com.sidequest.core.domain.service.PostDomainService;
 import com.sidequest.core.infrastructure.CommentDO;
 import com.sidequest.core.infrastructure.FavoriteDO;
 import com.sidequest.core.infrastructure.PostDO;
@@ -94,7 +96,15 @@ public class PostService {
     }
 
     public List<TagDO> getPopularTags() {
-        return tagMapper.selectList(new LambdaQueryWrapper<TagDO>().orderByDesc(TagDO::getHitCount).last("LIMIT 20"));
+        // 暂时 Mock 热门标签数据
+        String[] mockNames = {"游戏", "二次元", "日常", "硬核", "攻略", "同人", "音乐", "技术"};
+        return java.util.stream.IntStream.range(0, mockNames.length).mapToObj(i -> {
+            TagDO tag = new TagDO();
+            tag.setId((long) (i + 1));
+            tag.setName(mockNames[i]);
+            return tag;
+        }).collect(Collectors.toList());
+        // return tagMapper.selectList(new LambdaQueryWrapper<TagDO>().orderByDesc(TagDO::getHitCount).last("LIMIT 20"));
     }
 
     public PostVO getPostDetail(Long id, String currentUserId) {
