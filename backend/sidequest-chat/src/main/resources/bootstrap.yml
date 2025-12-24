@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: chat-service
+  cloud:
+    nacos:
+      server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:nacos:8848}
+      config:
+        file-extension: yaml
+        group: DEFAULT_GROUP
+      discovery:
+        server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:nacos:8848}
+
