@@ -255,8 +255,25 @@ java -jar target/sidequest-xxx-1.0.0-SNAPSHOT.jar
 ```
 或者在 IDE 中直接运行各服务的 `Application` 类。
 
-## 6. 验证部署
-- **网关检查**: 访问 `http://localhost:8080/actuator/health`
-- **Nacos 控制台**: 登录 `http://localhost:8848/nacos` (默认账号: nacos/nacos)，检查服务是否全部注册成功。
-- **Swagger UI** (如果开启): `http://localhost:8081/swagger-ui/index.html` (各服务端口不同)
+## 7. 域名与 HTTPS 配置 (生产环境)
+
+如果需要在生产环境配置域名和 HTTPS，请按照以下步骤操作：
+
+### 7.1 准备证书
+将你的 SSL 证书文件（`.pem` 和 `.key`）放置在 `infra/docker-compose/nginx/ssl` 目录下：
+- `fullchain.pem`
+- `privkey.pem`
+
+### 7.2 修改 Nginx 配置
+编辑 `infra/nginx/sidequest-mini.conf`：
+- 将 `server_name` 修改为你的实际域名。
+- 确认 `ssl_certificate` 和 `ssl_certificate_key` 的路径与容器内路径一致（默认为 `/etc/nginx/ssl/...`）。
+
+### 7.3 更新 Docker Compose
+确保 `infra/docker-compose/docker-compose.yml` 中的 `nginx` 服务已映射 443 端口并挂载了证书目录。
+
+### 7.4 重启服务
+```bash
+docker-compose up -d nginx
+```
 

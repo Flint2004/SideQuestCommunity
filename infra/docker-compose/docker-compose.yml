@@ -87,16 +87,14 @@ services:
     container_name: sidequest-nginx
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ../nginx/sidequest-mini.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/ssl:/etc/nginx/ssl # 挂载 SSL 证书目录
     depends_on:
       - gateway-service
     networks:
       - default
-
-networks:
-  default:
-    name: sidequest-network
 
   # --- Java 微服务 ---
   gateway-service:
@@ -236,3 +234,7 @@ networks:
       - NACOS_HOST=nacos
     depends_on:
       - nacos
+
+networks:
+  default:
+    name: sidequest-network
