@@ -7,7 +7,7 @@ COPY sidequest-core ./sidequest-core
 RUN mvn clean package -pl sidequest-core -am -DskipTests
 
 # Stage 2: Run
-FROM openjdk:17-jdk-slim
+FROM openjdk:17-slim
 WORKDIR /app
 COPY --from=build /app/sidequest-core/target/*.jar app.jar
 EXPOSE 8082

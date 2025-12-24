@@ -7,7 +7,7 @@ COPY sidequest-moderation ./sidequest-moderation
 RUN mvn clean package -pl sidequest-moderation -am -DskipTests
 
 # Stage 2: Run
-FROM openjdk:17-jdk-slim
+FROM openjdk:17-slim
 WORKDIR /app
 COPY --from=build /app/sidequest-moderation/target/*.jar app.jar
 EXPOSE 8085

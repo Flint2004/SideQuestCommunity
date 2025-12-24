@@ -7,7 +7,7 @@ COPY sidequest-analytics ./sidequest-analytics
 RUN mvn clean package -pl sidequest-analytics -am -DskipTests
 
 # Stage 2: Run
-FROM openjdk:17-jdk-slim
+FROM openjdk:17-slim
 WORKDIR /app
 COPY --from=build /app/sidequest-analytics/target/*.jar app.jar
 EXPOSE 8086

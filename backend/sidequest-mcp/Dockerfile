@@ -7,7 +7,7 @@ COPY sidequest-mcp ./sidequest-mcp
 RUN mvn clean package -pl sidequest-mcp -am -DskipTests
 
 # Stage 2: Run
-FROM openjdk:17-jdk-slim
+FROM openjdk:17-slim
 WORKDIR /app
 COPY --from=build /app/sidequest-mcp/target/*.jar app.jar
 EXPOSE 8087
