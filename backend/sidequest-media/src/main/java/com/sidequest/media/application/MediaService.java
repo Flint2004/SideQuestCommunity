@@ -1,6 +1,7 @@
 package com.sidequest.media.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sidequest.media.infrastructure.DanmakuDO;
 import com.sidequest.media.infrastructure.MediaDO;
 import com.sidequest.media.infrastructure.mapper.DanmakuMapper;
@@ -23,6 +24,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +34,7 @@ public class MediaService {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final MediaMapper mediaMapper;
     private final DanmakuMapper danmakuMapper;
+    private final ObjectMapper objectMapper;
     
     @Value("${minio.endpoint:http://minio:9000}")
     private String endpoint;
@@ -241,7 +244,11 @@ public class MediaService {
             log.info("Successfully completed HLS processing for mediaId: {}. URL: {}", mediaId, hlsUrl);
 
             // 5. 发送 Kafka 消息通知核心服务更新视频地址和封面地址
-            String payload = String.format("{\"videoUrl\":\"%s\", \"videoCoverUrl\":\"%s\"}", hlsUrl, finalCoverUrl);
+            Map<String, String> payloadMap = Map.of(
+                "videoUrl", hlsUrl,
+                "videoCoverUrl", finalCoverUrl
+            );
+            String payload = objectMapper.writeValueAsString(payloadMap);
             kafkaTemplate.send("video-ready-topic", mediaId.toString(), payload);
             log.info("Sent video-ready notification for mediaId: {}. Payload: {}", mediaId, payload);
 
