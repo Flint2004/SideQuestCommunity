@@ -27,6 +27,7 @@ public class PostDO {
     private String videoUrl;
     private String videoCoverUrl;
     private Integer videoDuration;
+    private Long mediaId;
     private String tags;
 
     public static final int STATUS_AUDITING = 0;

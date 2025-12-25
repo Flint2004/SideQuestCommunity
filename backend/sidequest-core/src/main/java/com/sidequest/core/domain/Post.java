@@ -17,6 +17,7 @@ public class Post {
     private String videoUrl;
     private String videoCoverUrl;
     private Integer videoDuration;
+    private Long mediaId;
     private Long sectionId;
     private List<String> tags;
     private LocalDateTime createTime;

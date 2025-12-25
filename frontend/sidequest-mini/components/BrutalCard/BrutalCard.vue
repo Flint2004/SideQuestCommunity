@@ -1,14 +1,24 @@
 <template>
-  <view class="brutal-card" @click="$emit('click')">
+  <view class="brutal-card" @click="handleCardClick">
     <view class="media-container" :style="{ height: cardHeight + 'rpx' }">
+      <video 
+        v-if="isPlaying"
+        id="videoPlayer"
+        :src="post.videoUrl" 
+        class="main-video"
+        autoplay
+        controls
+        @click.stop
+      />
       <image 
-        :src="post.imageUrls[0]" 
+        v-else
+        :src="post.imageUrls[0] || post.videoCoverUrl" 
         mode="aspectFill" 
         class="main-image"
         @load="onImageLoad"
       />
-      <view v-if="post.videoUrl" class="video-badge">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+      <view v-if="post.videoUrl && !isPlaying" class="video-badge">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
       </view>
@@ -50,13 +60,24 @@ const emit = defineEmits(['click', 'like', 'user-click'])
 
 const imgWidth = ref(0)
 const imgHeight = ref(0)
+const isPlaying = ref(false)
 
 const onImageLoad = (e) => {
   imgWidth.value = e.detail.width
   imgHeight.value = e.detail.height
 }
 
+const handleCardClick = () => {
+  if (props.post.videoUrl && !isPlaying.value) {
+    isPlaying.value = true
+  } else {
+    emit('click')
+  }
+}
+
 const cardHeight = computed(() => {
+  if (isPlaying.value) return 600 // 展开后的高度
+  
   if (!imgWidth.value || !imgHeight.value) {
     // 检查是否有 mock 数据中的宽高信息
     const match = props.post.imageUrls[0]?.match(/_w(\d+)_h(\d+)/)
@@ -86,6 +107,11 @@ const cardHeight = computed(() => {
     width: 100%;
     height: 100%;
     display: block;
+  }
+
+  .main-video {
+    width: 100%;
+    height: 100%;
   }
   
   .video-badge {

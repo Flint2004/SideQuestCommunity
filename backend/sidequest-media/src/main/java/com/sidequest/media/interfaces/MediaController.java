@@ -8,6 +8,7 @@ import com.sidequest.media.infrastructure.DanmakuDO;
 import com.sidequest.media.infrastructure.MediaDO;
 import com.sidequest.media.interfaces.dto.DanmakuRequest;
 import com.sidequest.media.interfaces.dto.DanmakuVO;
+import com.sidequest.media.interfaces.dto.MediaRegisterRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -23,6 +24,21 @@ import java.util.stream.Collectors;
 public class MediaController {
     private final MediaService mediaService;
     private final RedisTemplate<String, Object> redisTemplate;
+
+    @PostMapping("/register")
+    public Result<MediaDO> registerMedia(@Valid @RequestBody MediaRegisterRequest request) {
+        String userIdStr = UserContext.getUserId();
+        if (userIdStr == null) {
+            return Result.error(401, "Unauthorized");
+        }
+        Long userId = Long.parseLong(userIdStr);
+
+        MediaDO mediaDO = new MediaDO();
+        BeanUtils.copyProperties(request, mediaDO);
+        mediaDO.setAuthorId(userId);
+
+        return Result.success(mediaService.registerMedia(mediaDO));
+    }
 
     @GetMapping("/list")
     public Result<List<MediaDO>> getMyMedia(@RequestParam Long authorId) {

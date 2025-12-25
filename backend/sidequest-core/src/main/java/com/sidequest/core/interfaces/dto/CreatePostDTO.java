@@ -21,5 +21,6 @@ public class CreatePostDTO {
     private String videoUrl;
     private String videoCoverUrl;
     private Integer videoDuration;
+    private Long mediaId;
 }
 

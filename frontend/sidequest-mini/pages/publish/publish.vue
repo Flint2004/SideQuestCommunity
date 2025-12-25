@@ -12,7 +12,12 @@
       <view class="media-section">
       <view v-if="tempMedia" class="media-preview-container">
         <view class="media-preview brutal-card">
-          <image :src="tempMedia.path" mode="aspectFit" class="preview-img" />
+          <image :src="tempMedia.type === 'video' ? (tempMedia.thumbPath || tempMedia.path) : tempMedia.path" mode="aspectFit" class="preview-img" />
+          <view v-if="tempMedia.type === 'video'" class="video-badge">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          </view>
         </view>
         <view class="remove-btn" @click="tempMedia = null">✕</view>
       </view>
@@ -98,7 +103,8 @@ const form = reactive({
   imageUrls: [],
   videoUrl: '',
   videoCoverUrl: '',
-  videoDuration: 0
+  videoDuration: 0,
+  mediaId: null
 })
 
 onMounted(async () => {
@@ -150,6 +156,7 @@ const chooseMedia = () => {
         const file = res.tempFiles[0]
         tempMedia.value = {
           path: file.tempFilePath,
+          thumbPath: file.thumbTempFilePath, // 捕获视频封面/第一帧
           type: file.fileType,
           size: file.size,
           duration: file.duration || 0,
@@ -199,67 +206,73 @@ const submit = async () => {
   
   submitting.value = true
   try {
-    // 1. Get Upload URL
-    // H5 blob path doesn't have extension, default to jpg/mp4
-    let ext = 'jpg'
-    if (tempMedia.value.path.includes('.')) {
-      const parts = tempMedia.value.path.split('.')
-      const lastPart = parts.pop().toLowerCase()
-      if (['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'].includes(lastPart)) {
-        ext = lastPart
+    // 定义统一上传函数
+    const uploadFile = async (filePath, fileType) => {
+      let ext = fileType === 'video' ? 'mp4' : 'jpg'
+      if (filePath.includes('.')) {
+        const parts = filePath.split('.')
+        const lastPart = parts.pop().toLowerCase()
+        if (['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'].includes(lastPart)) {
+          ext = lastPart
+        }
       }
-    } else if (tempMedia.value.type === 'video') {
-      ext = 'mp4'
-    }
-    
-    const fileName = `post_${Date.now()}_w${tempMedia.value.width}_h${tempMedia.value.height}.${ext}`
-    
-    const uploadUrl = await request({
-      url: `/api/media/upload-url?fileName=${encodeURIComponent(fileName)}`
-    })
-    
-    // 2. Upload to MinIO (using ArrayBuffer for binary safety)
-    const binaryData = await new Promise((resolve, reject) => {
-      // H5 逻辑
-      if (typeof window !== 'undefined') {
-        fetch(tempMedia.value.path)
-          .then(res => res.arrayBuffer())
-          .then(resolve)
-          .catch(reject)
-      } else {
-        // 小程序/App 逻辑
-        const fs = uni.getFileSystemManager()
-        fs.readFile({
-          filePath: tempMedia.value.path,
-          success: res => resolve(res.data),
+      
+      const fileName = `post_${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`
+      const uploadUrl = await request({
+        url: `/api/media/upload-url?fileName=${encodeURIComponent(fileName)}`
+      })
+
+      const binaryData = await new Promise((resolve, reject) => {
+        if (typeof window !== 'undefined') {
+          fetch(filePath).then(res => res.arrayBuffer()).then(resolve).catch(reject)
+        } else {
+          uni.getFileSystemManager().readFile({ filePath, success: res => resolve(res.data), fail: reject })
+        }
+      })
+
+      await new Promise((resolve, reject) => {
+        uni.request({
+          url: uploadUrl,
+          method: 'PUT',
+          data: binaryData,
+          header: { 'Content-Type': fileType === 'video' ? 'video/mp4' : 'image/jpeg' },
+          success: (res) => (res.statusCode === 200 || res.statusCode === 204) ? resolve(res) : reject(new Error('Upload failed')),
           fail: reject
         })
+      })
+      
+      return uploadUrl.split('?')[0]
+    }
+
+    // 1. 上传主媒体文件
+    const mediaUrl = await uploadFile(tempMedia.value.path, tempMedia.value.type)
+    
+    // 2. 如果是视频，上传封面
+    let coverUrl = ''
+    if (tempMedia.value.type === 'video' && tempMedia.value.thumbPath) {
+      coverUrl = await uploadFile(tempMedia.value.thumbPath, 'image')
+    }
+
+    // 3. Register Media in Media Service
+    const registeredMedia = await request({
+      url: '/api/media/register',
+      method: 'POST',
+      data: {
+        fileName: mediaUrl.split('/').pop(),
+        fileKey: mediaUrl.split('/').pop(),
+        fileType: tempMedia.value.type,
+        url: mediaUrl
       }
     })
 
-    await new Promise((resolve, reject) => {
-      uni.request({
-        url: uploadUrl,
-        method: 'PUT',
-        data: binaryData,
-        header: {
-          'Content-Type': tempMedia.value.type === 'video' ? 'video/mp4' : 'image/jpeg'
-        },
-        success: (res) => {
-          if (res.statusCode === 200 || res.statusCode === 204) resolve(res)
-          else reject(new Error('Upload failed with status ' + res.statusCode))
-        },
-        fail: reject
-      })
-    })
-    
-    // 3. Create Post
-    const mediaUrl = uploadUrl.split('?')[0]
+    // 4. Create Post
     if (tempMedia.value.type === 'image') {
       form.imageUrls = [mediaUrl]
     } else {
       form.videoUrl = mediaUrl
+      form.videoCoverUrl = coverUrl
       form.videoDuration = Math.round(tempMedia.value.duration)
+      form.mediaId = registeredMedia.id // 关联 Media ID
     }
     
     await request({
@@ -268,7 +281,9 @@ const submit = async () => {
       data: {
         ...form,
         tags: form.tags,
-        imageUrls: form.imageUrls
+        imageUrls: form.imageUrls,
+        videoCoverUrl: form.videoCoverUrl,
+        mediaId: form.mediaId // 发送 Media ID
       }
     })
     
@@ -278,6 +293,7 @@ const submit = async () => {
     }, 1500)
   } catch (err) {
     console.error(err)
+    uni.showToast({ title: '发布失败，请重试', icon: 'none' })
   } finally {
     submitting.value = false
   }
@@ -336,6 +352,16 @@ const submit = async () => {
       .preview-img {
         width: 100%;
         height: 100%;
+      }
+
+      .video-badge {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: rgba(255, 255, 255, 0.8);
+        filter: drop-shadow(2px 2px 0px #000);
+        pointer-events: none;
       }
     }
     

@@ -366,6 +366,7 @@ public class PostService {
                 .videoUrl(dto.getVideoUrl())
                 .videoCoverUrl(dto.getVideoCoverUrl())
                 .videoDuration(dto.getVideoDuration())
+                .mediaId(dto.getMediaId())
                 .build();
         
         post.publish(); 
@@ -390,6 +391,7 @@ public class PostService {
         postDO.setVideoUrl(post.getVideoUrl());
         postDO.setVideoCoverUrl(post.getVideoCoverUrl());
         postDO.setVideoDuration(post.getVideoDuration());
+        postDO.setMediaId(post.getMediaId());
         if (post.getImageUrls() != null) {
             postDO.setImageUrls(String.join(",", post.getImageUrls()));
         }

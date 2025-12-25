@@ -19,12 +19,9 @@ public class VideoProcessConsumer {
         try {
             Long mediaId = Long.parseLong(message.split(": ")[1]);
             
-            // 模拟调用 FFmpeg 转码
-            log.info("Simulating FFmpeg transcoding for mediaId: {}", mediaId);
-            Thread.sleep(2000); // 模拟耗时
+            // 调用真正的 HLS 处理逻辑
+            mediaService.processHls(mediaId);
             
-            mediaService.updateStatus(mediaId, MediaDO.STATUS_READY); 
-            log.info("Successfully processed video: {}", mediaId);
         } catch (Exception e) {
             log.error("Error processing video task", e);
             // 失败更新状态

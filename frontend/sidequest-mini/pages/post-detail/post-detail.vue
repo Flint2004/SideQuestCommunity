@@ -10,9 +10,23 @@
     
     <scroll-view scroll-y class="content-scroll">
       <view class="post-detail brutal-card">
-        <!-- 图片容器：支持自适应填充 -->
+        <!-- 媒体容器：支持图片轮播和视频播放（含弹幕） -->
         <view class="media-box">
-          <swiper circular indicator-dots class="media-swiper" :style="{ height: swiperHeight }">
+          <template v-if="post.videoUrl">
+            <video 
+              id="myVideo"
+              class="post-video"
+              :src="post.videoUrl"
+              :poster="post.videoCoverUrl"
+              :danmu-list="danmuList"
+              enable-danmu
+              danmu-btn
+              controls
+              @timeupdate="onTimeUpdate"
+              :style="{ height: swiperHeight }"
+            />
+          </template>
+          <swiper v-else circular indicator-dots class="media-swiper" :style="{ height: swiperHeight }">
             <swiper-item v-for="(url, i) in post.imageUrls" :key="i">
               <image :src="url" mode="aspectFit" class="post-image" />
             </swiper-item>
@@ -66,7 +80,16 @@
     </scroll-view>
     
     <view class="footer safe-area-bottom brutal-card">
-      <view class="comment-input brutal-btn" @click="showCommentPopup = true">
+      <view v-if="post.videoUrl" class="danmaku-input-container brutal-btn">
+        <input 
+          v-model="danmakuContent" 
+          class="danmaku-input" 
+          placeholder="发个弹幕见证当下..." 
+          @confirm="sendDanmaku"
+        />
+        <view class="send-danmaku-btn" @click="sendDanmaku">发送</view>
+      </view>
+      <view v-else class="comment-input brutal-btn" @click="showCommentPopup = true">
         <text class="placeholder">说点什么...</text>
       </view>
       <view class="action-btn" @click="handleLike">
@@ -115,12 +138,16 @@ const post = ref({})
 const comments = ref([])
 const showCommentPopup = ref(false)
 const commentContent = ref('')
+const danmakuContent = ref('')
+const danmuList = ref([])
 const submittingComment = ref(false)
 const currentUserId = ref(uni.getStorageSync('userId'))
+let videoContext = null
 
 // 动态计算 Swiper 高度，最小 3:4
 const swiperHeight = computed(() => {
-  const match = post.value.imageUrls?.[0]?.match(/_w(\d+)_h(\d+)/)
+  const urlForMatch = post.value.videoUrl || post.value.imageUrls?.[0]
+  const match = urlForMatch?.match(/_w(\d+)_h(\d+)/)
   if (match) {
     const w = parseInt(match[1]); const h = parseInt(match[2])
     const ratio = h / w
@@ -149,8 +176,66 @@ onMounted(async () => {
     res.isFollowing = res.isFollowing || res.following || false
     post.value = { ...post.value, ...res } // 合并数据，保留初始状态直到加载完成
     comments.value = await request({ url: `/api/core/interactions/comments?postId=${id}` }) || []
+    
+    if (post.value.videoUrl) {
+      videoContext = uni.createVideoContext('myVideo')
+      fetchDanmaku()
+    }
   } catch (err) {}
 })
+
+const fetchDanmaku = async () => {
+  try {
+    // 初始加载前 10 分钟的弹幕
+    const res = await request({ 
+      url: `/api/media/danmaku?videoId=${post.value.id}&fromMs=0&toMs=600000` 
+    })
+    danmuList.value = res.map(d => ({
+      text: d.content,
+      color: d.color || '#ffffff',
+      time: Math.floor(d.timeOffsetMs / 1000)
+    }))
+  } catch (err) {}
+}
+
+const sendDanmaku = async () => {
+  if (!danmakuContent.value.trim()) return
+  const token = uni.getStorageSync('token')
+  if (!token) { bus.openLogin(); return }
+
+  try {
+    // 获取当前视频播放时间
+    const currentTimeMs = Math.floor(videoTime.value * 1000)
+
+    await request({
+      url: '/api/media/danmaku',
+      method: 'POST',
+      data: {
+        videoId: post.value.id,
+        content: danmakuContent.value,
+        timeOffsetMs: currentTimeMs,
+        color: '#ffffff'
+      }
+    })
+
+    // 发送到播放器界面
+    if (videoContext) {
+      videoContext.sendDanmu({
+        text: danmakuContent.value,
+        color: '#ffffff'
+      })
+    }
+    
+    danmakuContent.value = ''
+    uni.showToast({ title: '已发送', icon: 'none' })
+  } catch (err) {}
+}
+
+const videoTime = ref(0)
+const onTimeUpdate = (e) => {
+  videoTime.value = e.detail.currentTime
+}
+
 
 const handleLike = async () => {
   const token = uni.getStorageSync('token'); if (!token) { bus.openLogin(); return }
@@ -230,6 +315,7 @@ const submitComment = async () => {
 .post-detail { margin: 20rpx; background: var(--surface); border-radius: 32rpx; overflow: hidden;
   .media-box { background: var(--bg-main); // 自动填充背景边框
     .media-swiper { width: 100%; transition: height 0.3s ease; .post-image { width: 100%; height: 100%; } }
+    .post-video { width: 100%; transition: height 0.3s ease; }
   }
 }
 .author-row { padding: 30rpx; display: flex; align-items: center; justify-content: space-between; border-bottom: 2rpx solid #eee; .author-info { display: flex; align-items: center; gap: 20rpx; .avatar { width: 84rpx; height: 84rpx; border-radius: 50%; } .nickname { font-size: 30rpx; font-weight: 800; color: var(--text-main); } .time { font-size: 22rpx; opacity: 0.5; color: var(--text-main); } } 
@@ -301,7 +387,29 @@ const submitComment = async () => {
     } 
   } 
 }
-.footer { position: fixed; bottom: 0; left: 0; right: 0; height: 130rpx; background: var(--surface); display: flex; align-items: center; padding: 0 30rpx; gap: 30rpx; border-radius: 48rpx 48rpx 0 0; z-index: 100; border-top: 4rpx solid #000; .comment-input { flex: 1; height: 80rpx; justify-content: flex-start; padding-left: 30rpx; .placeholder { font-size: 26rpx; opacity: 0.5; color: var(--text-main); } } .action-btn { display: flex; flex-direction: column; align-items: center; color: var(--text-main); .count { font-size: 20rpx; font-weight: 800; margin-top: 4rpx; } } }
+.footer { position: fixed; bottom: 0; left: 0; right: 0; height: 130rpx; background: var(--surface); display: flex; align-items: center; padding: 0 30rpx; gap: 30rpx; border-radius: 48rpx 48rpx 0 0; z-index: 100; border-top: 4rpx solid #000; 
+  .comment-input { flex: 1; height: 80rpx; justify-content: flex-start; padding-left: 30rpx; .placeholder { font-size: 26rpx; opacity: 0.5; color: var(--text-main); } } 
+  .danmaku-input-container {
+    flex: 1;
+    height: 80rpx;
+    display: flex;
+    align-items: center;
+    padding: 0 20rpx;
+    gap: 10rpx;
+    .danmaku-input {
+      flex: 1;
+      font-size: 26rpx;
+      color: var(--text-main);
+    }
+    .send-danmaku-btn {
+      font-size: 24rpx;
+      font-weight: 800;
+      color: var(--primary);
+      padding: 10rpx 20rpx;
+    }
+  }
+  .action-btn { display: flex; flex-direction: column; align-items: center; color: var(--text-main); .count { font-size: 20rpx; font-weight: 800; margin-top: 4rpx; } } 
+}
 
 .comment-popup-mask {
   position: fixed;

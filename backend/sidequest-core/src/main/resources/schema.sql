@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS t_post (
     video_url VARCHAR(255),
     video_cover_url VARCHAR(255),
     video_duration INT DEFAULT 0,
+    media_id BIGINT,
     tags VARCHAR(255)
 );
 

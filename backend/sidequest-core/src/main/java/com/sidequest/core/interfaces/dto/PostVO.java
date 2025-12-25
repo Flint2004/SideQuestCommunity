@@ -26,6 +26,7 @@ public class PostVO {
     private String videoUrl;
     private String videoCoverUrl;
     private Integer videoDuration;
+    private Long mediaId;
     private List<String> tags;
 
     private boolean hasLiked;

@@ -1,14 +1,6 @@
 package com.sidequest.media.application;
 
-import com.sidequest.media.domain.Media;
-import com.sidequest.media.infrastructure.DanmakuDO;
-import com.sidequest.media.infrastructure.MediaDO;
-import com.sidequest.media.infrastructure.mapper.DanmakuMapper;
-import com.sidequest.media.infrastructure.mapper.MediaMapper;
-import io.minio.BucketExistsArgs;
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MakeBucketArgs;
-import io.minio.MinioClient;
+import io.minio.*;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +10,11 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import java.util.List;
@@ -82,7 +79,7 @@ public class MediaService {
                     "    }\n" +
                     "  ]\n" +
                     "}";
-            minioClient.setBucketPolicy(io.minio.SetBucketPolicyArgs.builder()
+            minioClient.setBucketPolicy(SetBucketPolicyArgs.builder()
                     .bucket(bucket)
                     .config(policy)
                     .build());
@@ -127,6 +124,94 @@ public class MediaService {
         log.info("Sent video processing request for mediaId: {}", mediaId);
     }
 
+    public void processHls(Long mediaId) {
+        MediaDO mediaDO = mediaMapper.selectById(mediaId);
+        if (mediaDO == null || !"video".equals(mediaDO.getFileType())) return;
+
+        Path tempDir = null;
+        try {
+            tempDir = Files.createTempDirectory("video_proc_" + mediaId);
+            String inputFileName = mediaDO.getFileKey();
+            Path inputPath = tempDir.resolve(inputFileName);
+
+            // 1. 从 MinIO 下载原始视频
+            log.info("Downloading original video for mediaId: {}", mediaId);
+            minioClient.downloadObject(
+                    DownloadObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(inputFileName)
+                            .filename(inputPath.toString())
+                            .build()
+            );
+
+            // 2. 使用 FFmpeg 进行 HLS 切片
+            log.info("Starting FFmpeg HLS slicing for mediaId: {}", mediaId);
+            String outputFileName = mediaId + ".m3u8";
+            Path outputPath = tempDir.resolve(outputFileName);
+            
+            ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg", "-i", inputPath.toString(),
+                "-profile:v", "baseline", "-level", "3.0",
+                "-s", "1280x720", "-start_number", "0",
+                "-hls_time", "10", "-hls_list_size", "0",
+                "-f", "hls", outputPath.toString()
+            );
+            pb.inheritIO();
+            Process process = pb.start();
+            boolean finished = process.waitFor(10, TimeUnit.MINUTES);
+            
+            if (!finished || process.exitValue() != 0) {
+                throw new RuntimeException("FFmpeg processing failed or timed out");
+            }
+
+            // 3. 上传切片后的文件 (.m3u8 和 .ts)
+            log.info("Uploading HLS slices for mediaId: {}", mediaId);
+            Files.list(tempDir).forEach(path -> {
+                String fileName = path.getFileName().toString();
+                if (fileName.endsWith(".m3u8") || fileName.endsWith(".ts")) {
+                    try {
+                        minioClient.uploadObject(
+                            UploadObjectArgs.builder()
+                                .bucket(bucket)
+                                .object("hls/" + mediaId + "/" + fileName)
+                                .filename(path.toString())
+                                .contentType(fileName.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T")
+                                .build()
+                        );
+                    } catch (Exception e) {
+                        log.error("Failed to upload HLS file: {}", fileName, e);
+                    }
+                }
+            });
+
+            // 4. 更新 MediaDO URL 为 .m3u8 地址
+            String hlsUrl = (publicEndpoint != null && !publicEndpoint.isBlank() ? publicEndpoint : endpoint) 
+                    + "/" + bucket + "/hls/" + mediaId + "/" + outputFileName;
+            mediaDO.setUrl(hlsUrl);
+            mediaDO.setStatus(MediaDO.STATUS_READY);
+            mediaMapper.updateById(mediaDO);
+            log.info("Successfully completed HLS processing for mediaId: {}. URL: {}", mediaId, hlsUrl);
+
+            // 5. 发送 Kafka 消息通知核心服务更新视频地址
+            kafkaTemplate.send("video-ready-topic", mediaId.toString(), hlsUrl);
+            log.info("Sent video-ready notification for mediaId: {}", mediaId);
+
+        } catch (Exception e) {
+            log.error("HLS processing failed for mediaId: {}", mediaId, e);
+            updateStatus(mediaId, MediaDO.STATUS_FAILED);
+        } finally {
+            // 清理临时目录
+            if (tempDir != null) {
+                try {
+                    Files.walk(tempDir)
+                        .sorted((p1, p2) -> p2.compareTo(p1))
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
     public Integer getStatus(Long mediaId) {
         MediaDO mediaDO = mediaMapper.selectById(mediaId);
         return mediaDO != null ? mediaDO.getStatus() : null;
@@ -139,6 +224,20 @@ public class MediaService {
             mediaMapper.updateById(mediaDO);
             log.info("Successfully updated media status for {}: {}", mediaId, status);
         }
+    }
+
+    public MediaDO registerMedia(MediaDO mediaDO) {
+        mediaDO.setStatus(MediaDO.STATUS_PROCESSING);
+        mediaDO.setCreateTime(LocalDateTime.now());
+        mediaMapper.insert(mediaDO);
+        log.info("Successfully registered media: {}", mediaDO.getId());
+        
+        if ("video".equals(mediaDO.getFileType())) {
+            processVideo(mediaDO.getId());
+        } else {
+            updateStatus(mediaDO.getId(), MediaDO.STATUS_READY);
+        }
+        return mediaDO;
     }
 
     public void saveDanmaku(DanmakuDO danmakuDO) {
