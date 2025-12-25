@@ -14,6 +14,17 @@ public interface IdentityClient {
     @GetMapping("/api/identity/me/following-ids")
     Result<java.util.List<Long>> getFollowingIds();
 
+    @GetMapping("/api/identity/users/{id}/public")
+    Result<UserPublicDTO> getUserPublicProfile(@PathVariable("id") Long id);
+
+    @Data
+    class UserPublicDTO {
+        private Long id;
+        private String nickname;
+        private String avatar;
+        private boolean isFollowing;
+    }
+
     @Data
     class UserDTO {
         private Long id;

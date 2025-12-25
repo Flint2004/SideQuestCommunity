@@ -101,6 +101,17 @@ public class PostService {
                 (u1, u2) -> u1
         ));
 
+        // 获取当前用户的关注列表
+        Set<Long> followingIds = new java.util.HashSet<>();
+        if (currentUserId != null && !currentUserId.isBlank() && !"null".equals(currentUserId)) {
+            try {
+                Result<List<Long>> followingRes = identityClient.getFollowingIds();
+                if (followingRes.getCode() == 200 && followingRes.getData() != null) {
+                    followingIds.addAll(followingRes.getData());
+                }
+            } catch (Exception ignored) {}
+        }
+
         Page<PostVO> voPage = new Page<>(current, size, postPage.getTotal());
         List<PostVO> voList = postPage.getRecords().stream().map(doItem -> {
             PostVO vo = convertToVO(doItem, currentUserId);
@@ -112,6 +123,7 @@ public class PostService {
                     vo.setAuthorName(user.getNickname());
                 }
             }
+            vo.setFollowing(followingIds.contains(doItem.getAuthorId()));
             return vo;
         }).collect(Collectors.toList());
         
@@ -168,10 +180,11 @@ public class PostService {
         
         PostVO vo = convertToVO(post, currentUserId);
         try {
-            Result<IdentityClient.UserDTO> userRes = identityClient.getUserById(post.getAuthorId());
+            Result<IdentityClient.UserPublicDTO> userRes = identityClient.getUserPublicProfile(post.getAuthorId());
             if (userRes.getCode() == 200 && userRes.getData() != null) {
                 vo.setAuthorAvatar(userRes.getData().getAvatar());
                 vo.setAuthorName(userRes.getData().getNickname());
+                vo.setFollowing(userRes.getData().isFollowing());
             }
         } catch (Exception ignored) {}
         

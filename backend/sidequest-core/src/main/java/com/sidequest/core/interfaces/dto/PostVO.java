@@ -29,5 +29,6 @@ public class PostVO {
 
     private boolean hasLiked;
     private boolean hasFavorited;
+    private boolean isFollowing;
 }
 

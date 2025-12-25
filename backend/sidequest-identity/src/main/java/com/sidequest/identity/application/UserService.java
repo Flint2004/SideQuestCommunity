@@ -85,7 +85,9 @@ public class UserService {
 
     @Transactional
     public void followUser(Long followerId, Long followingId) {
-        if (followerId.equals(followingId)) return;
+        if (followerId.equals(followingId)) {
+            throw new RuntimeException("You cannot follow yourself");
+        }
         
         LambdaQueryWrapper<FollowDO> query = new LambdaQueryWrapper<FollowDO>()
                 .eq(FollowDO::getFollowerId, followerId)
@@ -106,6 +108,40 @@ public class UserService {
                     .eq(UserDO::getId, followingId)
                     .setSql("follower_count = follower_count + 1"));
         }
+    }
+
+    public Page<UserDO> getFollowers(Long userId, int current, int size) {
+        Page<FollowDO> followPage = new Page<>(current, size);
+        followMapper.selectPage(followPage, new LambdaQueryWrapper<FollowDO>()
+                .eq(FollowDO::getFollowingId, userId)
+                .orderByDesc(FollowDO::getCreateTime));
+        
+        List<Long> followerIds = followPage.getRecords().stream()
+                .map(FollowDO::getFollowerId)
+                .collect(java.util.stream.Collectors.toList());
+        
+        Page<UserDO> userPage = new Page<>(followPage.getCurrent(), followPage.getSize(), followPage.getTotal());
+        if (!followerIds.isEmpty()) {
+            userPage.setRecords(userMapper.selectBatchIds(followerIds));
+        }
+        return userPage;
+    }
+
+    public Page<UserDO> getFollowings(Long userId, int current, int size) {
+        Page<FollowDO> followPage = new Page<>(current, size);
+        followMapper.selectPage(followPage, new LambdaQueryWrapper<FollowDO>()
+                .eq(FollowDO::getFollowerId, userId)
+                .orderByDesc(FollowDO::getCreateTime));
+        
+        List<Long> followingIds = followPage.getRecords().stream()
+                .map(FollowDO::getFollowingId)
+                .collect(java.util.stream.Collectors.toList());
+        
+        Page<UserDO> userPage = new Page<>(followPage.getCurrent(), followPage.getSize(), followPage.getTotal());
+        if (!followingIds.isEmpty()) {
+            userPage.setRecords(userMapper.selectBatchIds(followingIds));
+        }
+        return userPage;
     }
 
     @Transactional

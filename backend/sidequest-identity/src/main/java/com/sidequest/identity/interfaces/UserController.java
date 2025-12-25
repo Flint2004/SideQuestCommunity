@@ -107,6 +107,28 @@ public class UserController {
         return Result.success(userService.getFollowingIds(Long.parseLong(userId)));
     }
 
+    @GetMapping("/users/{id}/followers")
+    public Result<Page<UserVO>> getFollowers(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int current,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<UserDO> userPage = userService.getFollowers(id, current, size);
+        Page<UserVO> voPage = new Page<>(userPage.getCurrent(), userPage.getSize(), userPage.getTotal());
+        voPage.setRecords(userPage.getRecords().stream().map(this::convertToVO).collect(Collectors.toList()));
+        return Result.success(voPage);
+    }
+
+    @GetMapping("/users/{id}/following")
+    public Result<Page<UserVO>> getFollowing(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int current,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<UserDO> userPage = userService.getFollowings(id, current, size);
+        Page<UserVO> voPage = new Page<>(userPage.getCurrent(), userPage.getSize(), userPage.getTotal());
+        voPage.setRecords(userPage.getRecords().stream().map(this::convertToVO).collect(Collectors.toList()));
+        return Result.success(voPage);
+    }
+
     @PostMapping("/admin/users/{id}/ban")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<String> banUser(@PathVariable Long id) {
