@@ -27,8 +27,8 @@ public class SearchController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime"));
-        // 修复搜索逻辑：仅对标题和标签进行搜索，且必须匹配其中之一
-        Page<PostDoc> postDocs = postRepository.findByKeyword(keyword, keyword, pageable);
+        // 修复搜索逻辑：仅对标题和标签进行搜索，且大小写不敏感
+        Page<PostDoc> postDocs = postRepository.findByKeyword(keyword, pageable);
         postDocs.forEach(this::enrichAuthorInfo);
         return Result.success(postDocs);
     }
