@@ -21,6 +21,9 @@ public class PostDoc {
     @Field(type = FieldType.Keyword)
     private String authorName;
 
+    @Field(type = FieldType.Keyword)
+    private String authorAvatar;
+
     @Field(type = FieldType.Long)
     private Long authorId;
     
@@ -47,5 +50,8 @@ public class PostDoc {
     
     @Field(type = FieldType.Long)
     private Long createTime;
+
+    @Field(type = FieldType.Keyword)
+    private String tags;
 }
 

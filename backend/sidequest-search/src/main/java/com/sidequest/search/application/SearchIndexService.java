@@ -29,6 +29,7 @@ public class SearchIndexService {
             doc.setTitle((String) postMap.get("title"));
             doc.setContent((String) postMap.get("content"));
             doc.setAuthorName((String) postMap.getOrDefault("authorName", "Unknown"));
+            doc.setAuthorAvatar((String) postMap.get("authorAvatar"));
             doc.setAuthorId(postMap.get("authorId") != null ? Long.valueOf(postMap.get("authorId").toString()) : null);
             doc.setImageUrls((String) postMap.get("imageUrls"));
             doc.setSectionId(postMap.get("sectionId") != null ? Long.valueOf(postMap.get("sectionId").toString()) : null);
@@ -37,7 +38,21 @@ public class SearchIndexService {
             doc.setCommentCount((Integer) postMap.getOrDefault("commentCount", 0));
             doc.setFavoriteCount((Integer) postMap.getOrDefault("favoriteCount", 0));
             doc.setViewCount((Integer) postMap.getOrDefault("viewCount", 0));
-            doc.setCreateTime(System.currentTimeMillis());
+            doc.setTags((String) postMap.get("tags"));
+            
+            Object createTime = postMap.get("createTime");
+            if (createTime instanceof Long) {
+                doc.setCreateTime((Long) createTime);
+            } else if (createTime instanceof String) {
+                // 简单处理字符串格式，如果是 ISO 格式或时间戳
+                try {
+                    doc.setCreateTime(Long.valueOf((String) createTime));
+                } catch (Exception e) {
+                    doc.setCreateTime(System.currentTimeMillis());
+                }
+            } else {
+                doc.setCreateTime(System.currentTimeMillis());
+            }
             
             postRepository.save(doc);
             log.info("Successfully indexed post: {}", doc.getId());

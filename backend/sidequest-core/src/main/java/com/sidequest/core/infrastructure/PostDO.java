@@ -13,6 +13,7 @@ public class PostDO {
     private Long id;
     private Long authorId;
     private String authorName; // 冗余字段，优化查询
+    private String authorAvatar; // 冗余字段
     private String title;
     private String content;
     private Long sectionId;
