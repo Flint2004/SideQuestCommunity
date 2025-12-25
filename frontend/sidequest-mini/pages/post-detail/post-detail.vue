@@ -12,7 +12,7 @@
       <view class="post-detail brutal-card">
         <!-- 媒体容器：支持图片轮播和视频播放（含弹幕） -->
         <view class="media-box">
-          <template v-if="post.videoUrl">
+          <template v-if="post.videoUrl && isDataReady">
             <video 
               id="myVideo"
               class="post-video"
@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import request from '@/utils/request'
 import { bus } from '@/utils/bus'
 
@@ -144,6 +144,7 @@ const danmakuContent = ref('')
 const danmuList = ref([])
 const submittingComment = ref(false)
 const currentUserId = ref(uni.getStorageSync('userId'))
+const isDataReady = ref(false)
 let videoContext = null
 
 // 动态计算 Swiper 高度，最小 3:4
@@ -180,10 +181,19 @@ onMounted(async () => {
     comments.value = await request({ url: `/api/core/interactions/comments?postId=${id}` }) || []
     
     if (post.value.videoUrl) {
-      videoContext = uni.createVideoContext('myVideo')
-      fetchDanmaku()
+      await fetchDanmaku()
     }
-  } catch (err) {}
+    
+    isDataReady.value = true
+    
+    nextTick(() => {
+      if (post.value.videoUrl) {
+        videoContext = uni.createVideoContext('myVideo')
+      }
+    })
+  } catch (err) {
+    isDataReady.value = true
+  }
 })
 
 const fetchDanmaku = async () => {
