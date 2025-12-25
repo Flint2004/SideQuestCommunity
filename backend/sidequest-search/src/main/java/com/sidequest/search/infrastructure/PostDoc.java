@@ -51,7 +51,7 @@ public class PostDoc {
     @Field(type = FieldType.Long)
     private Long createTime;
 
-    @Field(type = FieldType.Keyword)
+    @Field(type = FieldType.Text, analyzer = "ik_smart")
     private String tags;
 }
 
