@@ -4,6 +4,13 @@
       <view class="profile-header">
         <view class="status-bar" :style="{ height: statusBarHeight + 'px' }" />
         <view class="settings-bar">
+          <view v-if="user.id" class="icon-btn brutal-btn logout-btn" @click="handleLogout">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </view>
           <view class="icon-btn brutal-btn" @click="toggleDark">
             <svg v-if="isDark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
               <circle cx="12" cy="12" r="5"></circle>
@@ -75,6 +82,19 @@
     
     <BrutalTabBar activeTab="me" />
     <LoginModal />
+
+    <!-- 退出确认弹窗 -->
+    <view v-if="showLogoutModal" class="modal-mask" @click="showLogoutModal = false">
+      <view class="confirm-modal brutal-card" @click.stop>
+        <view class="warning-icon">!</view>
+        <view class="confirm-title">EXIT SESSION?</view>
+        <text class="confirm-text">确定要退出登录吗？退出后将返回首页。</text>
+        <view class="confirm-btns">
+          <button class="brutal-btn cancel" @click="showLogoutModal = false">取消</button>
+          <button class="brutal-btn primary confirm" @click="confirmLogout">确定退出</button>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -90,6 +110,7 @@ const statusBarHeight = ref(0)
 const activeContentTab = ref(0)
 const user = ref({})
 const posts = ref([])
+const showLogoutModal = ref(false)
 
 const stats = computed(() => [
   { label: '关注', value: user.value.followingCount || 0, type: 'following' },
@@ -192,6 +213,29 @@ const goToLogin = () => {
 const goToEdit = () => {
   uni.navigateTo({ url: '/pages/me/edit' })
 }
+
+const handleLogout = () => {
+  showLogoutModal.value = true
+}
+
+const confirmLogout = () => {
+  showLogoutModal.value = false
+  uni.removeStorageSync('token')
+  uni.removeStorageSync('userInfo')
+  uni.removeStorageSync('userId')
+  user.value = {}
+  
+  uni.showToast({
+    title: '已退出登录',
+    icon: 'none'
+  })
+  
+  setTimeout(() => {
+    uni.reLaunch({
+      url: '/pages/index/index'
+    })
+  }, 500)
+}
 </script>
 
 <style lang="scss" scoped>
@@ -223,6 +267,15 @@ const goToEdit = () => {
   width: 64rpx;
   height: 64rpx;
   border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logout-btn {
+  margin-right: 20rpx;
+  background-color: #fff;
+  border: 4rpx solid #000;
 }
 
 .user-info {
@@ -337,6 +390,106 @@ const goToEdit = () => {
     display: flex;
     flex-direction: column;
     gap: 20rpx;
+  }
+}
+
+.logout-section {
+  padding: 40rpx 20rpx;
+  display: flex;
+  justify-content: center;
+  
+  .logout-full-btn {
+    width: 100%;
+    height: 100rpx;
+    background-color: var(--bg-main);
+    color: #ff4d4f;
+    font-size: 32rpx;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 6rpx solid #000;
+  }
+}
+
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+}
+
+.confirm-modal {
+  width: 100%;
+  max-width: 600rpx;
+  background-color: var(--bg-main);
+  padding: 60rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: rotate(-1deg);
+  
+  .warning-icon {
+    width: 100rpx;
+    height: 100rpx;
+    background-color: #ff4d4f;
+    border: 4rpx solid #000;
+    color: #fff;
+    font-size: 60rpx;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 30rpx;
+    transform: rotate(5deg);
+  }
+  
+  .confirm-title {
+    font-size: 44rpx;
+    font-weight: 900;
+    font-style: italic;
+    margin-bottom: 20rpx;
+    color: var(--text-main);
+  }
+  
+  .confirm-text {
+    font-size: 28rpx;
+    font-weight: 700;
+    color: var(--text-main);
+    text-align: center;
+    margin-bottom: 50rpx;
+    line-height: 1.5;
+    opacity: 0.8;
+  }
+  
+  .confirm-btns {
+    width: 100%;
+    display: flex;
+    gap: 20rpx;
+    
+    .brutal-btn {
+      flex: 1;
+      height: 90rpx;
+      font-size: 28rpx;
+      font-weight: 900;
+      
+      &.cancel {
+        background-color: var(--surface);
+      }
+      
+      &.confirm {
+        background-color: #ff4d4f;
+        color: #fff;
+      }
+    }
   }
 }
 </style>
