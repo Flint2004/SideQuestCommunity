@@ -101,6 +101,13 @@ public class UserController {
         return Result.success("Profile updated");
     }
 
+    @PutMapping("/password")
+    public Result<String> updatePassword(@Valid @RequestBody UpdatePasswordRequest request) {
+        String userId = UserContext.getUserId();
+        userService.updatePassword(Long.parseLong(userId), request.getOldPassword(), request.getNewPassword());
+        return Result.success("Password updated");
+    }
+
     @GetMapping("/me/following-ids")
     public Result<List<Long>> getFollowingIds() {
         String userId = UserContext.getUserId();
@@ -148,6 +155,14 @@ public class UserController {
         private String nickname;
         private String avatar;
         private String signature;
+    }
+
+    @Data
+    public static class UpdatePasswordRequest {
+        @NotBlank(message = "Old password cannot be blank")
+        private String oldPassword;
+        @NotBlank(message = "New password cannot be blank")
+        private String newPassword;
     }
 }
 

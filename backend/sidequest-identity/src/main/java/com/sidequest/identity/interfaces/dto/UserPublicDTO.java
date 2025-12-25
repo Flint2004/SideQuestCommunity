@@ -1,5 +1,6 @@
 package com.sidequest.identity.interfaces.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
@@ -13,6 +14,8 @@ public class UserPublicDTO {
     private Integer followingCount;
     private Integer totalLikedCount;
     private Integer postCount;
+    
+    @JsonProperty("isFollowing")
     private boolean isFollowing;
 }
 

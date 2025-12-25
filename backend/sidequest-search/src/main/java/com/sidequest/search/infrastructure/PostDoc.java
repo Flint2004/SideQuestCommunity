@@ -24,6 +24,9 @@ public class PostDoc {
     @Field(type = FieldType.Long)
     private Long authorId;
     
+    @Field(type = FieldType.Keyword)
+    private String imageUrls;
+    
     @Field(type = FieldType.Long)
     private Long sectionId;
     

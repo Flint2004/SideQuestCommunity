@@ -29,6 +29,8 @@ public class SearchIndexService {
             doc.setTitle((String) postMap.get("title"));
             doc.setContent((String) postMap.get("content"));
             doc.setAuthorName((String) postMap.getOrDefault("authorName", "Unknown"));
+            doc.setAuthorId(postMap.get("authorId") != null ? Long.valueOf(postMap.get("authorId").toString()) : null);
+            doc.setImageUrls((String) postMap.get("imageUrls"));
             doc.setSectionId(postMap.get("sectionId") != null ? Long.valueOf(postMap.get("sectionId").toString()) : null);
             doc.setStatus((Integer) postMap.get("status"));
             doc.setLikeCount((Integer) postMap.getOrDefault("likeCount", 0));

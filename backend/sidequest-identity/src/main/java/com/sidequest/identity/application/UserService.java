@@ -55,6 +55,20 @@ public class UserService {
         }
     }
 
+    public void updatePassword(Long userId, String oldPassword, String newPassword) {
+        UserDO userDO = userMapper.selectById(userId);
+        if (userDO == null) {
+            throw new RuntimeException("User not found");
+        }
+        
+        if (!passwordEncoder.matches(oldPassword, userDO.getPassword())) {
+            throw new RuntimeException("Invalid old password");
+        }
+        
+        userDO.setPassword(passwordEncoder.encode(newPassword));
+        userMapper.updateById(userDO);
+    }
+
     public void banUser(Long userId) {
         UserDO userDO = userMapper.selectById(userId);
         if (userDO != null) {

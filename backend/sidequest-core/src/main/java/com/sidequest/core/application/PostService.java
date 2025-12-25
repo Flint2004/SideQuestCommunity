@@ -226,6 +226,41 @@ public class PostService {
         }).collect(Collectors.toList());
     }
 
+    public Page<PostVO> getUserFavoritePosts(String userId, int current, int size) {
+        Long uid = Long.parseLong(userId);
+        List<FavoriteDO> favorites = favoriteMapper.selectList(new LambdaQueryWrapper<FavoriteDO>()
+                .eq(FavoriteDO::getUserId, uid)
+                .orderByDesc(FavoriteDO::getCreateTime));
+        
+        if (favorites.isEmpty()) return new Page<>(current, size);
+        
+        List<Long> postIds = favorites.stream().map(FavoriteDO::getPostId).collect(Collectors.toList());
+        LambdaQueryWrapper<PostDO> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(PostDO::getId, postIds);
+        queryWrapper.eq(PostDO::getStatus, PostDO.STATUS_NORMAL);
+        // 按收藏顺序排序
+        queryWrapper.last("ORDER BY FIELD(id, " + postIds.stream().map(String::valueOf).collect(Collectors.joining(",")) + ")");
+        
+        return getPostVOPage(current, size, userId, queryWrapper);
+    }
+
+    public Page<PostVO> getUserLikedPosts(String userId, int current, int size) {
+        Long uid = Long.parseLong(userId);
+        List<LikeDO> likes = likeMapper.selectList(new LambdaQueryWrapper<LikeDO>()
+                .eq(LikeDO::getUserId, uid)
+                .orderByDesc(LikeDO::getCreateTime));
+        
+        if (likes.isEmpty()) return new Page<>(current, size);
+        
+        List<Long> postIds = likes.stream().map(LikeDO::getPostId).collect(Collectors.toList());
+        LambdaQueryWrapper<PostDO> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(PostDO::getId, postIds);
+        queryWrapper.eq(PostDO::getStatus, PostDO.STATUS_NORMAL);
+        queryWrapper.last("ORDER BY FIELD(id, " + postIds.stream().map(String::valueOf).collect(Collectors.joining(",")) + ")");
+        
+        return getPostVOPage(current, size, userId, queryWrapper);
+    }
+
     public List<FavoriteDO> getUserFavorites(String userId) {
         LambdaQueryWrapper<FavoriteDO> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(FavoriteDO::getUserId, Long.parseLong(userId));

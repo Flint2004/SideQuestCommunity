@@ -7,6 +7,8 @@ import com.sidequest.core.infrastructure.CommentDO;
 import com.sidequest.core.infrastructure.FavoriteDO;
 import com.sidequest.core.interfaces.dto.CommentRequest;
 import com.sidequest.core.interfaces.dto.CommentVO;
+import com.sidequest.core.interfaces.dto.PostVO;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -24,9 +26,21 @@ public class InteractionController {
     }
 
     @GetMapping("/favorites")
-    public Result<List<FavoriteDO>> getMyFavorites() {
+    public Result<Page<PostVO>> getMyFavorites(
+            @RequestParam(defaultValue = "1") int current,
+            @RequestParam(defaultValue = "10") int size) {
         String userId = UserContext.getUserId();
-        return Result.success(postService.getUserFavorites(userId));
+        if (userId == null) return Result.error(401, "Unauthorized");
+        return Result.success(postService.getUserFavoritePosts(userId, current, size));
+    }
+
+    @GetMapping("/likes")
+    public Result<Page<PostVO>> getMyLikes(
+            @RequestParam(defaultValue = "1") int current,
+            @RequestParam(defaultValue = "10") int size) {
+        String userId = UserContext.getUserId();
+        if (userId == null) return Result.error(401, "Unauthorized");
+        return Result.success(postService.getUserLikedPosts(userId, current, size));
     }
     
     @PostMapping("/comment")
