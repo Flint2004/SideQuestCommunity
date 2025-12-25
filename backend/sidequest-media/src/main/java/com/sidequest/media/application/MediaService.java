@@ -153,19 +153,33 @@ public class MediaService {
             String outputFileName = mediaId + ".m3u8";
             Path outputPath = tempDir.resolve(outputFileName);
             
+            // 改进 FFmpeg 命令：增加编码参数以提高兼容性，并减少日志干扰
             ProcessBuilder pb = new ProcessBuilder(
                 "ffmpeg", "-i", inputPath.toString(),
+                "-c:v", "libx264", "-c:a", "aac", // 显式指定编码器
+                "-strict", "-2",
                 "-profile:v", "baseline", "-level", "3.0",
                 "-s", "1280x720", "-start_number", "0",
                 "-hls_time", "10", "-hls_list_size", "0",
                 "-f", "hls", outputPath.toString()
             );
-            pb.inheritIO();
+            pb.redirectErrorStream(true); // 将标准错误合并到标准输出
             Process process = pb.start();
-            boolean finished = process.waitFor(10, TimeUnit.MINUTES);
             
-            if (!finished || process.exitValue() != 0) {
-                throw new RuntimeException("FFmpeg processing failed or timed out");
+            // 实时读取 FFmpeg 输出，防止缓冲区溢出导致死锁
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    log.debug("FFmpeg output [mediaId={}]: {}", mediaId, line);
+                }
+            }
+
+            boolean finished = process.waitFor(15, TimeUnit.MINUTES);
+            int exitCode = process.exitValue();
+            log.info("FFmpeg process finished for mediaId: {}. Exit code: {}, Timeout: {}", mediaId, exitCode, !finished);
+            
+            if (!finished || exitCode != 0) {
+                throw new RuntimeException("FFmpeg processing failed with exit code " + exitCode);
             }
 
             // 3. 上传切片后的文件 (.m3u8 和 .ts)
@@ -174,10 +188,12 @@ public class MediaService {
                 String fileName = path.getFileName().toString();
                 if (fileName.endsWith(".m3u8") || fileName.endsWith(".ts")) {
                     try {
+                        String objectPath = "hls/" + mediaId + "/" + fileName;
+                        log.debug("Uploading HLS fragment: {} to {}", fileName, objectPath);
                         minioClient.uploadObject(
                             UploadObjectArgs.builder()
                                 .bucket(bucket)
-                                .object("hls/" + mediaId + "/" + fileName)
+                                .object(objectPath)
                                 .filename(path.toString())
                                 .contentType(fileName.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T")
                                 .build()

@@ -124,28 +124,51 @@ const goBack = () => {
 }
 
 const chooseMedia = () => {
-  // H5 兼容性处理：优先使用 chooseImage，因为 chooseMedia 在部分 H5 环境不支持
+  // H5 兼容性处理
   const isH5 = typeof window !== 'undefined'
   
   if (isH5) {
-    uni.chooseImage({
-      count: 1,
+    uni.showActionSheet({
+      itemList: ['选择图片', '选择视频'],
       success: (res) => {
-        const file = res.tempFiles[0]
-        tempMedia.value = {
-          path: file.path,
-          type: 'image',
-          size: file.size,
-          width: 0,
-          height: 0
+        if (res.tapIndex === 0) {
+          uni.chooseImage({
+            count: 1,
+            success: (imgRes) => {
+              const file = imgRes.tempFiles[0]
+              tempMedia.value = {
+                path: file.path,
+                type: 'image',
+                size: file.size,
+                width: 0,
+                height: 0
+              }
+              uni.getImageInfo({
+                src: file.path,
+                success: (info) => {
+                  tempMedia.value.width = info.width
+                  tempMedia.value.height = info.height
+                }
+              })
+            }
+          })
+        } else {
+          uni.chooseVideo({
+            count: 1,
+            sourceType: ['album', 'camera'],
+            success: (vidRes) => {
+              tempMedia.value = {
+                path: vidRes.tempFilePath,
+                thumbPath: vidRes.thumbTempFilePath,
+                type: 'video',
+                size: vidRes.size,
+                duration: vidRes.duration,
+                width: vidRes.width,
+                height: vidRes.height
+              }
+            }
+          })
         }
-        uni.getImageInfo({
-          src: file.path,
-          success: (info) => {
-            tempMedia.value.width = info.width
-            tempMedia.value.height = info.height
-          }
-        })
       }
     })
   } else {
@@ -209,12 +232,18 @@ const submit = async () => {
     // 定义统一上传函数
     const uploadFile = async (filePath, fileType) => {
       let ext = fileType === 'video' ? 'mp4' : 'jpg'
-      if (filePath.includes('.')) {
-        const parts = filePath.split('.')
+      
+      // 提取真实扩展名
+      if (filePath && filePath.includes('.')) {
+        const parts = filePath.split('?')[0].split('.')
         const lastPart = parts.pop().toLowerCase()
-        if (['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'].includes(lastPart)) {
+        if (['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'webp', 'm4v'].includes(lastPart)) {
           ext = lastPart
         }
+      } else if (fileType === 'image') {
+        ext = 'jpg'
+      } else if (fileType === 'video') {
+        ext = 'mp4'
       }
       
       const fileName = `post_${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`
@@ -223,10 +252,22 @@ const submit = async () => {
       })
 
       const binaryData = await new Promise((resolve, reject) => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && filePath.startsWith('blob:')) {
+          // H5 Blob 处理
+          fetch(filePath).then(res => res.arrayBuffer()).then(resolve).catch(reject)
+        } else if (typeof window !== 'undefined') {
+          // 普通 H5 文件处理
           fetch(filePath).then(res => res.arrayBuffer()).then(resolve).catch(reject)
         } else {
-          uni.getFileSystemManager().readFile({ filePath, success: res => resolve(res.data), fail: reject })
+          // 小程序/App 离线文件读取
+          uni.getFileSystemManager().readFile({ 
+            filePath, 
+            success: res => resolve(res.data), 
+            fail: (err) => {
+              console.error('File read failed:', err)
+              reject(new Error('无法读取本地文件: ' + filePath))
+            } 
+          })
         }
       })
 
@@ -235,9 +276,14 @@ const submit = async () => {
           url: uploadUrl,
           method: 'PUT',
           data: binaryData,
-          header: { 'Content-Type': fileType === 'video' ? 'video/mp4' : 'image/jpeg' },
-          success: (res) => (res.statusCode === 200 || res.statusCode === 204) ? resolve(res) : reject(new Error('Upload failed')),
-          fail: reject
+          header: { 
+            'Content-Type': fileType === 'video' ? 'video/mp4' : (ext === 'png' ? 'image/png' : 'image/jpeg') 
+          },
+          success: (res) => {
+            if (res.statusCode === 200 || res.statusCode === 204) resolve(res)
+            else reject(new Error('上传到存储服务失败: ' + res.statusCode))
+          },
+          fail: (err) => reject(new Error('网络请求失败: ' + err.errMsg))
         })
       })
       
