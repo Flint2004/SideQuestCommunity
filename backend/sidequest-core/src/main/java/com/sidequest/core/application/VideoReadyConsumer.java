@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,7 +19,7 @@ public class VideoReadyConsumer {
     private final PostMapper postMapper;
 
     @KafkaListener(topics = "video-ready-topic", groupId = "core-group")
-    public void onVideoReady(String mediaIdStr, String hlsUrl) {
+    public void onVideoReady(@Header(KafkaHeaders.RECEIVED_KEY) String mediaIdStr, @Payload String hlsUrl) {
         log.info("Received video ready event for mediaId: {}, HLS URL: {}", mediaIdStr, hlsUrl);
         try {
             Long mediaId = Long.parseLong(mediaIdStr);
