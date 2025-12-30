@@ -98,9 +98,9 @@ services:
   # --- 前端与网关代理 ---
   nginx:
     image: nginx
-    build:
-      context: ../../frontend/sidequest-mini
-      dockerfile: Dockerfile
+    # build:
+    #   context: ../../frontend/sidequest-mini
+    #   dockerfile: Dockerfile
     container_name: sidequest-nginx
     ports:
       - "80:80"
@@ -108,7 +108,7 @@ services:
     volumes:
       - ../nginx/sidequest-mini.conf:/etc/nginx/conf.d/default.conf
       - ./nginx/ssl:/etc/nginx/ssl # 挂载 SSL 证书目录
-      # - ./nginx/html:/usr/share/nginx/html
+      - ./nginx/html:/usr/share/nginx/html
     depends_on:
       - gateway-service
     networks:
@@ -285,9 +285,13 @@ services:
       - SPRING_DATASOURCE_USERNAME=default
       - SPRING_DATASOURCE_PASSWORD=
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
       - SPRING_PROFILES_ACTIVE=dev
     depends_on:
       clickhouse:
+        condition: service_started
+      redis:
         condition: service_started
       kafka:
         condition: service_started
